@@ -63,3 +63,19 @@ def test_build_spatial_with_and_without_directory():
     assert build_spatial(departments(), bogota(), DirOk()).localities.match_rate == 0.75
     res = build_spatial(departments(), bogota(), DirDown())
     assert res.localities is None and res.departments.bogota_rank == 1
+
+
+def test_locality_results_include_statistical_tests():
+    import numpy as np
+    from saber11.models.dataset.dataset_models import DANE_SCHOOL, DANE_SITE
+    from saber11.services.spatial.spatial_service import locality_results
+
+    rng = np.random.default_rng(3)
+    n = 240
+    bogota = pd.DataFrame(rng.normal(50, 10, size=(n, 5)), columns=list(SCORES))
+    bogota[DANE_SITE] = ["111001000001"] * 120 + ["111001000002"] * 120
+    bogota[DANE_SCHOOL] = bogota[DANE_SITE]
+    directory = pd.DataFrame({"dane_sede": ["111001000001", "111001000002"],
+                              "dane_est": ["111001000001", "111001000002"], "cod_localidad": ["01", "02"]})
+    result = locality_results(bogota, directory, "local", per_group=100, seed=123)
+    assert result.tests is not None and result.tests.n_sample == 200

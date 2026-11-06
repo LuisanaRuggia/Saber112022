@@ -50,7 +50,8 @@ def _analyze(config: PipelineConfig, ing: IngestionResult, directory_repo) -> di
         "manova": _stage("manova", run_manova, s, a),
         "hotelling": _stage("hotelling", pairwise_hotelling, s, a),
         "pca": _stage("pca", run_pca, s),
-        "spatial": _stage("spatial", build_spatial, ing.departments, ing.bogota, directory_repo),
+        "spatial": _stage("spatial", build_spatial, ing.departments, ing.bogota, directory_repo,
+                          config.sample_per_group, config.seed),
     }
 
 

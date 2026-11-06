@@ -1,6 +1,6 @@
 """Narrative conclusions in Spanish, derived only from the analysis results."""
 
-from saber11.core.formatting.spanish_numbers import fmt_num, fmt_p, fmt_pct
+from saber11.core.formatting.spanish_numbers import fmt_num, fmt_p, fmt_p_clause, fmt_pct
 from saber11.models.analysis.analysis_models import (
     AssumptionsResult, DescriptiveResult, HotellingPair, ManovaResult, PcaResult)
 from saber11.models.dataset.dataset_models import SCORE_LABELS, SHIFT_LABELS
@@ -92,6 +92,23 @@ def _locality_finding(spatial: SpatialResult) -> str:
             f"{fmt_pct(loc.match_rate)} de los estudiantes.")
 
 
+def _locality_test_finding(spatial: SpatialResult) -> list[str]:
+    tests = spatial.localities.tests if spatial.localities else None
+    if tests is None:
+        return []
+    labels = {"avg_5": "el promedio de las 5 pruebas", **SCORE_LABELS}
+    differ = [labels[r.variable] for r in tests.rows if r.p_bonferroni < 0.05]
+    main = tests.rows[0]
+    reason = "se cumple la normalidad" if main.normal else "no se cumple la normalidad"
+    verb = "difiere" if main.p_bonferroni < 0.05 else "no difiere"
+    head = (f"Entre localidades, {labels[main.variable]} {verb} ({main.test}, porque {reason}; "
+            f"{fmt_p_clause(main.p_bonferroni).replace('p ', 'p ajustado ', 1)}, "
+            f"{main.effect_label} = {fmt_num(main.effect_size, 3)}).")
+    detail = (f"Las localidades difieren en: {', '.join(differ)}." if differ
+              else "Ninguna prueba muestra diferencias entre localidades tras Bonferroni.")
+    return [head, detail]
+
+
 def _caveats(assump: AssumptionsResult, alpha: float, n_sample: int, n_pop: int) -> list[str]:
     mardia = assump.mardia
     rejected = min(mardia.skewness_p, mardia.kurtosis_p) < alpha
@@ -116,7 +133,8 @@ def draw_conclusions(descriptive, assumptions, manova, hotelling, pca, spatial, 
                 if rejects else "No hay evidencia de diferencias en el rendimiento de Saber 11 entre jornadas en Bogotá.")
     findings = [_manova_finding(manova, alpha), _anova_finding(manova, alpha),
                 *_hotelling_findings(hotelling, alpha), _gap_finding(descriptive),
-                *_pca_findings(pca), _department_finding(spatial), _locality_finding(spatial)]
+                *_pca_findings(pca), _department_finding(spatial), _locality_finding(spatial),
+                *_locality_test_finding(spatial)]
     n_sample = sum(descriptive.n_by_group.values())
     n_pop = sum(descriptive.population_n_by_group.values())
     return Conclusions(headline, findings, _caveats(assumptions, alpha, n_sample, n_pop))

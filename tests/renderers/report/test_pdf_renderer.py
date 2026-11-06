@@ -36,3 +36,12 @@ def test_outlier_share_is_rendered_as_percentage_once(tmp_path):
 
     text = "".join(p.extract_text() for p in PdfReader(render_pdf(build_results(), tmp_path / "r.pdf")).pages)
     assert "3,8 %" in text and "375,0 %" not in text and "p = <" not in text
+
+
+def test_locality_comparison_table_is_rendered(tmp_path):
+    from pypdf import PdfReader
+    from saber11.renderers.report.pdf_renderer import render_pdf
+    from tests.fakes.results_factory import build_results
+
+    text = "".join(p.extract_text() for p in PdfReader(render_pdf(build_results(), tmp_path / "r.pdf")).pages)
+    assert "Comparación entre localidades" in text and "Shapiro-Wilk" in text and "Kruskal-Wallis" in text

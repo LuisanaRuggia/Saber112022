@@ -9,7 +9,7 @@ from saber11.models.analysis.analysis_models import (
 )
 from saber11.models.dataset.dataset_models import SCORES, SHIFTS
 from saber11.models.report.report_models import PipelineResults, RunMetadata
-from saber11.models.spatial.spatial_models import DepartmentRanking, LocalityResult, SpatialResult
+from saber11.models.spatial.spatial_models import DepartmentRanking, LocalityResult, LocalityTestResult, LocalityTestRow, SpatialResult
 from saber11.services.conclusions.conclusions_service import draw_conclusions
 
 
@@ -62,7 +62,10 @@ def _spatial(with_localities: bool) -> SpatialResult:
         table = pd.DataFrame({
             "cod_localidad": ["02", "08"], "localidad": ["Chapinero", "Kennedy"], "n": [500, 900],
             **{s: [65.0, 55.0] for s in SCORES}, "avg_5": [65.0, 55.0]})
-        loc = LocalityResult(table, 0.93, 4000, "https://example.org/dir.geojson")
+        rows = [LocalityTestRow("avg_5", False, 3, 0.04, "Kruskal-Wallis", 85.2, 1e-9, 6e-9, 0.12, "ε²"),
+                *[LocalityTestRow(s, True, 0, 0.3, "ANOVA", 4.1, 0.02, 0.12, 0.05, "η²") for s in SCORES]]
+        tests = LocalityTestResult(rows, 100, 123, 200, 2, [])
+        loc = LocalityResult(table, 0.93, 4000, "https://example.org/dir.geojson", tests)
     return SpatialResult(DepartmentRanking(depts, 1, 3), loc)
 
 

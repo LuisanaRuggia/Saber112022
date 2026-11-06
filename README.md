@@ -20,7 +20,7 @@ ingesta ─► descriptivo ─► supuestos ─► MANOVA + ANOVA ─► Hotelli
 | Descriptivo | Tamaño por grupo, medias y desviaciones por jornada (muestra y población), matrices de covarianzas y correlaciones. |
 | Supuestos | Atípicos por distancia de Mahalanobis (χ² al 97,5 %), normalidad multivariada de Mardia (global y por jornada) y M de Box. |
 | Explicativo | MANOVA (Pillai, Wilks, Hotelling-Lawley, Roy; η² parcial), ANOVA por prueba con Bonferroni, T² de Hotelling por pares con Bonferroni, PCA sobre la matriz de correlaciones y ANOVA del CP1. |
-| Espacial | Ranking de los departamentos (n ≥ 30) por Matemáticas + Lectura y resultados por localidad de Bogotá, cruzando el código DANE con el directorio de colegios de la SED. |
+| Espacial | Ranking de los departamentos (n ≥ 30) por Matemáticas + Lectura y resultados por localidad de Bogotá, cruzando el código DANE con el directorio de colegios de la SED. Comparación entre localidades (muestra de hasta 100 por localidad): Shapiro-Wilk por localidad con Bonferroni; si se cumple la normalidad se usa ANOVA (η²) y si no, Kruskal-Wallis (ε²), para el promedio de las 5 pruebas y para cada prueba. |
 | Informe | `informe_saber11_<periodo>.pdf` con portada, metodología, resultados, conclusiones y fuentes. |
 
 ## Requisitos

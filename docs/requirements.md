@@ -59,5 +59,6 @@ datos y sin figuras.
 ## Backlog priorizado (MoSCoW)
 
 - **Must:** HU-01 a HU-08.
-- **Could:** análisis espacial inferencial (por ejemplo, I de Moran o ANOVA por localidad); se consulta con la usuaria.
+- **Must (aprobado el 2026-11-06):** comparación entre localidades: Shapiro-Wilk por localidad; ANOVA si se cumple la normalidad, Kruskal-Wallis si no.
+- **Could:** I de Moran (autocorrelación espacial); no solicitado.
 - **Won't (ahora):** figuras y póster.

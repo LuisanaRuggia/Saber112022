@@ -39,3 +39,13 @@ def test_missing_localities_is_noted():
 
 def test_no_em_dashes():
     assert "—" not in _text(build_results().conclusions)
+
+
+def test_locality_comparison_names_the_test_used():
+    from saber11.services.conclusions.conclusions_service import draw_conclusions
+
+    r = build_results()
+    c = draw_conclusions(r.descriptive, r.assumptions, r.manova, r.hotelling, r.pca, r.spatial, 0.05)
+    text = " ".join(c.findings)
+    assert "Kruskal-Wallis" in text and "promedio de las 5 pruebas" in text
+    assert "p ajustado < 0,001" in text

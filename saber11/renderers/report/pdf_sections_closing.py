@@ -3,6 +3,7 @@
 from saber11.core.formatting.spanish_numbers import fmt_num, fmt_pct
 from saber11.models.dataset.dataset_models import SCORE_LABELS, SCORES
 from saber11.models.report.report_models import PipelineResults
+from saber11.renderers.report.pdf_sections_locality import locality_tests_block
 from saber11.renderers.report.pdf_styles import H1, H2, bullet, make_table, para
 
 _SHORT = {"punt_matematicas": "Mat.", "punt_lectura_critica": "Lect.", "punt_c_naturales": "Nat.",
@@ -29,7 +30,8 @@ def _locality_block(results: PipelineResults) -> list:
     for _, r in loc.table.iterrows():
         rows.append([r["localidad"], fmt_num(r["n"], 0), *[fmt_num(r[s], 1) for s in SCORES], fmt_num(r["avg_5"], 1)])
     return [make_table(rows), para(f"Tasa de cruce con el directorio: {fmt_pct(loc.match_rate)} "
-                                   f"de {fmt_num(loc.n_students, 0)} estudiantes. Directorio: {loc.directory_source}")]
+                                   f"de {fmt_num(loc.n_students, 0)} estudiantes. Directorio: {loc.directory_source}"),
+            *locality_tests_block(loc.tests)]
 
 
 def spatial_section(results: PipelineResults) -> list:

@@ -7,6 +7,7 @@ from saber11.models.dataset.dataset_models import DANE_SCHOOL, DANE_SITE, LOCALI
 from saber11.models.spatial.spatial_models import DepartmentRanking, LocalityResult, SpatialResult
 from saber11.repositories.directory.school_directory_repository import SchoolDirectoryRepository
 from saber11.services.ingestion.ingestion_service import is_bogota
+from saber11.services.spatial.locality_test_service import compare_localities
 
 MIN_N = 30
 
@@ -40,8 +41,8 @@ def _assign_locality(bogota: pd.DataFrame, directory: pd.DataFrame) -> pd.Series
     return by_site.fillna(by_school)
 
 
-def locality_results(bogota: pd.DataFrame, directory: pd.DataFrame,
-                     directory_source: str) -> LocalityResult:
+def locality_results(bogota: pd.DataFrame, directory: pd.DataFrame, directory_source: str,
+                     per_group: int = 100, seed: int = 123) -> LocalityResult:
     """Join students to localities through DANE codes and summarize each locality."""
     codes = _assign_locality(bogota, directory)
     scored = bogota[list(SCORES)].assign(cod_localidad=codes.values).dropna(subset=["cod_localidad"])
@@ -53,16 +54,18 @@ def locality_results(bogota: pd.DataFrame, directory: pd.DataFrame,
     t.insert(1, "localidad", t["cod_localidad"].map(LOCALITIES).fillna(t["cod_localidad"]))
     t = t.sort_values("avg_5", ascending=False).reset_index(drop=True)
     n = len(bogota)
+    tests = compare_localities(scored, per_group, seed) if t["n"].ge(3).sum() >= 2 else None
     return LocalityResult(table=t, match_rate=len(scored) / n if n else 0.0,
-                          n_students=n, directory_source=directory_source)
+                          n_students=n, directory_source=directory_source, tests=tests)
 
 
 def build_spatial(departments: pd.DataFrame, bogota: pd.DataFrame,
-                  directory_repo: SchoolDirectoryRepository | None) -> SpatialResult:
+                  directory_repo: SchoolDirectoryRepository | None,
+                  per_group: int = 100, seed: int = 123) -> SpatialResult:
     """Rank departments and, if the directory is reachable, summarize localities."""
     ranking = rank_departments(departments)
     try:
         directory, source = (directory_repo or SchoolDirectoryRepository()).fetch()
     except SourceUnavailableError:
         return SpatialResult(departments=ranking, localities=None)
-    return SpatialResult(departments=ranking, localities=locality_results(bogota, directory, source))
+    return SpatialResult(departments=ranking, localities=locality_results(bogota, directory, source, per_group, seed))

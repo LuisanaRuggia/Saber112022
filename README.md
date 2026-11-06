@@ -61,6 +61,11 @@ Todo se configura con variables de entorno:
 | `SABER11_OUTPUT_DIR` | `output` | Carpeta de salida |
 | `SOCRATA_APP_TOKEN` | | Token opcional de datos.gov.co (evita el error 429) |
 
+## Periodo del proyecto
+
+El proyecto usa **2022-2** (`20224`): es el periodo más reciente con microdatos por estudiante en
+datos abiertos, y todo se descarga sin registro. El informe lo justifica en la metodología.
+
 ## Datos 2023 en adelante (DataIcfes)
 
 La API abierta de datos.gov.co solo llega hasta **2022-2** (`20224`). Los microdatos por estudiante

@@ -37,6 +37,10 @@ def methodology(results: PipelineResults) -> list:
     sources = [f"Fuente de datos: {m.source_detail}.",
                "Filtros: colegios de Bogotá; jornadas Completa, Mañana, Tarde y Única "
                "(se excluyen Noche y Sabatina); sin puntajes faltantes."]
+    if m.source == "api":
+        sources.append("Periodo: es el periodo más reciente con microdatos por estudiante en datos abiertos "
+                       "(datos.gov.co). Los periodos 2023 a 2025 solo se distribuyen por DataIcfes, con registro; "
+                       "el pipeline puede procesarlos sin cambios en el código cuando se disponga del archivo.")
     design = [f"Muestra estratificada por jornada: {m.sample_per_group} estudiantes por grupo, semilla {m.seed}."]
     tests = ["Estadística descriptiva (medias, desviaciones, covarianzas, correlaciones).",
              "Distancia de Mahalanobis (atípicos), normalidad multivariada de Mardia y M de Box.",

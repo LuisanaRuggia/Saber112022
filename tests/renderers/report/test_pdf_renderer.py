@@ -45,3 +45,16 @@ def test_locality_comparison_table_is_rendered(tmp_path):
 
     text = "".join(p.extract_text() for p in PdfReader(render_pdf(build_results(), tmp_path / "r.pdf")).pages)
     assert "Comparación entre localidades" in text and "Shapiro-Wilk" in text and "Kruskal-Wallis" in text
+
+
+def test_api_source_explains_why_this_period(tmp_path):
+    from dataclasses import replace
+    from pypdf import PdfReader
+    from saber11.renderers.report.pdf_renderer import render_pdf
+    from tests.fakes.results_factory import build_results
+
+    base = build_results()
+    for source, expected in (("api", True), ("dataicfes", False)):
+        r = replace(base, metadata=replace(base.metadata, source=source))
+        text = " ".join(p.extract_text() for p in PdfReader(render_pdf(r, tmp_path / f"{source}.pdf")).pages)
+        assert ("periodo más reciente con microdatos" in " ".join(text.split())) is expected

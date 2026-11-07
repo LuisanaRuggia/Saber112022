@@ -18,15 +18,16 @@ def _method_text(tests: LocalityTestResult) -> str:
     return (f"Muestra estratificada de hasta {tests.per_group} estudiantes por localidad (semilla {tests.seed}; "
             f"n = {fmt_num(tests.n_sample, 0)}, {tests.n_groups} localidades).{excluded} Para cada variable se "
             "aplica Shapiro-Wilk en cada localidad con corrección de Bonferroni entre localidades. Si ninguna "
-            "rechaza la normalidad se usa ANOVA de una vía (η²); si alguna la rechaza se usa Kruskal-Wallis (ε²). "
-            "Levene se reporta como referencia. El p ajustado aplica Bonferroni entre las variables comparadas.")
+            "rechaza la normalidad se usa ANOVA de una vía (η²), o ANOVA de Welch si Levene rechaza la igualdad de "
+            "varianzas; si alguna localidad rechaza la normalidad se usa Kruskal-Wallis (ε²). El p ajustado aplica "
+            f"Bonferroni entre las variables comparadas (α = {fmt_num(tests.alpha, 2)}).")
 
 
 def _rows(tests: LocalityTestResult) -> list[list[str]]:
     rows = [["Variable", "Normalidad", "Levene p", "Prueba", "Estadístico", "p ajustado", "Efecto", "Decisión"]]
     for r in tests.rows:
         normality = "Cumple" if r.normal else f"No cumple ({r.n_rejected_normality})"
-        decision = "Difieren" if r.p_bonferroni < 0.05 else "No difieren"
+        decision = "Difieren" if r.p_bonferroni < tests.alpha else "No difieren"
         rows.append([variable_label(r.variable), normality, fmt_p(r.levene_p), r.test,
                      fmt_num(r.statistic, 2), fmt_p(r.p_bonferroni),
                      f"{r.effect_label} = {fmt_num(r.effect_size, 3)}", decision])

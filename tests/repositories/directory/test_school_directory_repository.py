@@ -52,3 +52,16 @@ def test_fetch_reads_local_geojson_without_network(tmp_path):
     frame, source = SchoolDirectoryRepository(session=NoNetwork(), local_path=path).fetch()
     assert frame.to_dict("records") == [{"dane_sede": "111001000132", "dane_est": "111001000132", "cod_localidad": "01"}]
     assert source == str(path)
+
+
+def test_invalid_json_answers_are_source_errors(tmp_path):
+    class NotJson(FakeResponse):
+        def json(self):
+            raise ValueError("Expecting value")
+    with pytest.raises(SourceUnavailableError, match="not JSON"):
+        SchoolDirectoryRepository(session=FakeSession([NotJson()])).fetch()
+    bad = tmp_path / "bad.geojson"
+    bad.write_text("<html>")
+    from saber11.core.errors.pipeline_errors import DataValidationError
+    with pytest.raises(DataValidationError):
+        SchoolDirectoryRepository(local_path=bad).fetch()

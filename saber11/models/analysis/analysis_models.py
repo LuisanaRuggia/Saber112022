@@ -14,7 +14,7 @@ class DescriptiveResult:
     std: pd.DataFrame              # rows: shifts, cols: scores
     overall_mean: pd.Series        # index: scores
     overall_std: pd.Series
-    covariance: pd.DataFrame       # pooled sample covariance (scores x scores)
+    covariance: pd.DataFrame       # total sample covariance, ignoring shifts (scores x scores)
     correlation: pd.DataFrame
     population_n_by_group: dict[str, int]
     population_means: pd.DataFrame  # full Bogotá population, rows: shifts
@@ -56,11 +56,18 @@ class BoxMResult:
 
 @dataclass(frozen=True)
 class AssumptionsResult:
-    """All assumption checks."""
+    """All assumption checks.
+
+    `mahalanobis` and `mardia` follow the course guide (total covariance, so shift mean
+    differences inflate them); the `_within` variants use residuals from each shift mean
+    and the pooled within-shift covariance, which is what MANOVA actually assumes.
+    """
 
     mahalanobis: MahalanobisResult
     mardia: MardiaResult
     box_m: BoxMResult
+    mahalanobis_within: MahalanobisResult
+    mardia_within: MardiaResult
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,6 @@
 """Typed pipeline settings parsed once from the environment."""
 
+import codecs
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,7 @@ class PipelineConfig:
     source: str = "api"
     period: str = "20224"
     dataicfes_path: Path | None = None
+    dataicfes_encoding: str | None = None  # None: detect UTF-8, else Latin-1
     sample_per_group: int = 100
     seed: int = 123
     output_dir: Path = Path("output")
@@ -41,6 +43,17 @@ def _int(env: Mapping[str, str], key: str, default: int) -> int:
     return value
 
 
+def _encoding(name: str | None) -> str | None:
+    """Return the encoding name if Python knows it; None means auto-detect."""
+    if name is None:
+        return None
+    try:
+        codecs.lookup(name)
+    except LookupError as exc:
+        raise ConfigError(f"SABER11_DATAICFES_ENCODING {name!r} is not a known encoding") from exc
+    return name
+
+
 def load_config(env: Mapping[str, str] | None = None) -> PipelineConfig:
     """Build and validate the config from environment variables."""
     env = os.environ if env is None else env
@@ -51,6 +64,7 @@ def load_config(env: Mapping[str, str] | None = None) -> PipelineConfig:
     path = Path(raw_path) if raw_path else None
     if source == "dataicfes" and (path is None or not path.is_file()):
         raise ConfigError("SABER11_DATAICFES_PATH must point to an existing file")
+    encoding = _encoding(env.get("SABER11_DATAICFES_ENCODING", "").strip() or None)
     raw_dir = env.get("SABER11_DIRECTORY_PATH")
     directory = Path(raw_dir) if raw_dir else None
     if directory is not None and not directory.is_file():
@@ -62,6 +76,7 @@ def load_config(env: Mapping[str, str] | None = None) -> PipelineConfig:
         source=source,
         period=period,
         dataicfes_path=path,
+        dataicfes_encoding=encoding,
         sample_per_group=_int(env, "SABER11_SAMPLE_PER_GROUP", 100),
         seed=_int(env, "SABER11_SEED", 123),
         output_dir=Path(env.get("SABER11_OUTPUT_DIR", "output")),

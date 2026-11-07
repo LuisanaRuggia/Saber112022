@@ -11,16 +11,17 @@ conclusiones (solo tablas y texto, sin figuras).
 ## Qué hace
 
 ```
-ingesta ─► descriptivo ─► supuestos ─► MANOVA + ANOVA ─► Hotelling ─► PCA ─► espacial ─► conclusiones ─► PDF
+ingesta ─► descriptivo ─► supuestos ─► MANOVA + ANOVA ─► Hotelling ─► PCA ─► espacial ─► sensibilidad ─► conclusiones ─► PDF
 ```
 
 | Etapa | Contenido |
 |---|---|
-| Ingesta | Estudiantes de Bogotá del periodo elegido (API de datos.gov.co o archivo de DataIcfes), sin Noche ni Sabatina y sin puntajes faltantes. Muestra estratificada de 100 por jornada (semilla 123). Promedios de todos los departamentos. |
+| Ingesta | Estudiantes de Bogotá del periodo elegido (API de datos.gov.co o archivo de DataIcfes), un registro por estudiante (`estu_consecutivo`: la fuente repite filas), sin Noche ni Sabatina y sin puntajes faltantes. Muestra estratificada de 100 por jornada (semilla 123). Promedios de todos los departamentos con los mismos filtros. |
 | Descriptivo | Tamaño por grupo, medias y desviaciones por jornada (muestra y población), matrices de covarianzas y correlaciones. |
-| Supuestos | Atípicos por distancia de Mahalanobis (χ² al 97,5 %), normalidad multivariada de Mardia (global y por jornada) y M de Box. |
+| Supuestos | Atípicos por distancia de Mahalanobis (χ² al 97,5 %), normalidad multivariada de Mardia (global y por jornada) y M de Box. Mahalanobis y Mardia también sobre los residuos dentro de cada jornada. |
 | Explicativo | MANOVA (Pillai, Wilks, Hotelling-Lawley, Roy; η² parcial), ANOVA por prueba con Bonferroni, T² de Hotelling por pares con Bonferroni, PCA sobre la matriz de correlaciones y ANOVA del CP1. |
-| Espacial | Ranking de los departamentos (n ≥ 30) por Matemáticas + Lectura y resultados por localidad de Bogotá, cruzando el código DANE con el directorio de colegios de la SED. Comparación entre localidades (muestra de hasta 100 por localidad): Shapiro-Wilk por localidad con Bonferroni; si se cumple la normalidad se usa ANOVA (η²) y si no, Kruskal-Wallis (ε²), para el promedio de las 5 pruebas y para cada prueba. |
+| Sensibilidad | MANOVA sin los atípicos intra-jornada, y MANOVA y T² de Hotelling solo con colegios oficiales (la jornada Completa es casi toda privada), con la tabla de % de privados por jornada. |
+| Espacial | Ranking de los departamentos (n ≥ 30) por Matemáticas + Lectura y resultados por localidad de Bogotá, cruzando el código DANE con el directorio de colegios de la SED. Comparación entre localidades (muestra de hasta 100 por localidad): Shapiro-Wilk por localidad con Bonferroni; si se cumple la normalidad se usa ANOVA (η²), o ANOVA de Welch si Levene rechaza la igualdad de varianzas, y si no, Kruskal-Wallis (ε²), para el promedio de las 5 pruebas y para cada prueba. |
 | Informe | `informe_saber11_<periodo>.pdf` con portada, metodología, resultados, conclusiones y fuentes. |
 
 ## Requisitos
@@ -55,11 +56,16 @@ Todo se configura con variables de entorno:
 | `SABER11_SOURCE` | `api` | `api` (datos.gov.co) o `dataicfes` (archivo local) |
 | `SABER11_PERIOD` | `20224` | Periodo: año + semestre (por ejemplo, `20252`) |
 | `SABER11_DATAICFES_PATH` | | Ruta del archivo de DataIcfes (obligatoria si la fuente es `dataicfes`) |
+| `SABER11_DATAICFES_ENCODING` | | Codificación del archivo de DataIcfes. Si no se indica, se detecta (UTF-8 o Latin-1) |
 | `SABER11_DIRECTORY_PATH` | | GeoJSON local del directorio de colegios. Si no se indica, se descarga la versión más reciente |
 | `SABER11_SAMPLE_PER_GROUP` | `100` | Estudiantes por jornada en la muestra |
 | `SABER11_SEED` | `123` | Semilla del muestreo |
 | `SABER11_OUTPUT_DIR` | `output` | Carpeta de salida |
 | `SOCRATA_APP_TOKEN` | | Token opcional de datos.gov.co (evita el error 429) |
+| `SABER11_DEBUG` | | Con `1`, muestra el traceback de un error inesperado |
+
+La salida estándar solo trae la ruta del PDF; el avance por etapas (JSON por línea) y los errores van a la
+salida de error. Los archivos se escriben al final: si algo falla, no quedan salidas a medias.
 
 ## Periodo del proyecto
 
@@ -83,8 +89,8 @@ SABER11_DATAICFES_PATH=~/Descargas/Examen_Saber_11_20252.txt \
 uv run python -m saber11 run
 ```
 
-El lector detecta el delimitador (`¬`, `|`, `;` o `,`), pasa los nombres de columna a minúsculas y lee
-el archivo por bloques.
+El lector detecta el delimitador (`¬`, `|`, `;` o `,`) y la codificación (UTF-8 o Latin-1), pasa los
+nombres de columna a minúsculas y lee el archivo por bloques.
 
 ## Directorio de colegios
 
@@ -124,7 +130,8 @@ uv run pytest -q -m network       # pruebas contra las fuentes reales
 
 `tests/fixtures/muestra_saber11_20224.csv` es la muestra 2022 de la guía original. Las pruebas
 comprueban que el pipeline reproduce sus resultados: Pillai 0,202; η² parcial 0,067; M de Box
-p = 0,238; 15 atípicos; CP1 76,5 %.
+p = 0,238; 15 atípicos (método de la guía); CP1 76,5 %. Esa muestra trae 2 filas repetidas porque la
+guía la sacó de la fuente sin quitar duplicados; se deja tal cual para conservar la referencia.
 
 ## Estructura
 
@@ -134,10 +141,10 @@ saber11/
   core/         contrato de errores y formato de números en español
   models/       contratos de datos y resultados entre capas
   repositories/ fuentes: API Socrata, archivo DataIcfes, directorio de colegios
-  services/     ingesta, descriptivo, supuestos, inferencia, PCA, espacial, conclusiones
+  services/     ingesta, descriptivo, supuestos, inferencia, PCA, espacial, sensibilidad, conclusiones
   renderers/    informe PDF (ReportLab)
   pipelines/    orquestación y escritura de salidas
-docs/           requisitos y arquitectura
+docs/           arquitectura y decisiones
 tests/          misma estructura que saber11/
 ```
 

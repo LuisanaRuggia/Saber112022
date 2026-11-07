@@ -7,16 +7,13 @@ from saber11.models.dataset.dataset_models import SCORE_LABELS, SCORES, SHIFT_LA
 from saber11.models.report.report_models import PipelineResults
 from saber11.renderers.report.pdf_styles import H1, H2, make_table, para
 
-_SHORT = {s: SCORE_LABELS[s] for s in SCORES}
-
-
 def _matrix(df: pd.DataFrame, decimals: int) -> list[list[str]]:
-    rows = [[""] + [_SHORT[c] for c in df.columns]]
-    return rows + [[_SHORT.get(i, i), *[fmt_num(v, decimals) for v in df.loc[i]]] for i in df.index]
+    rows = [[""] + [SCORE_LABELS[c] for c in df.columns]]
+    return rows + [[SCORE_LABELS.get(i, i), *[fmt_num(v, decimals) for v in df.loc[i]]] for i in df.index]
 
 
 def _means_rows(means: pd.DataFrame, std: pd.DataFrame | None) -> list[list[str]]:
-    rows = [["Jornada", *[_SHORT[s] for s in SCORES]]]
+    rows = [["Jornada", *[SCORE_LABELS[s] for s in SCORES]]]
     for g in means.index:
         cells = [f"{fmt_num(means.loc[g, s], 1)} ({fmt_num(std.loc[g, s], 1)})" if std is not None
                  else fmt_num(means.loc[g, s], 1) for s in SCORES]
@@ -37,6 +34,21 @@ def descriptive_section(results: PipelineResults) -> list:
             para("Matriz de correlaciones (muestra)", H2), make_table(_matrix(d.correlation, 3))]
 
 
+WITHIN_NOTE = ("La guía calcula Mahalanobis y Mardia con la covarianza total, que mezcla las diferencias entre "
+               "jornadas con la variación de los estudiantes. El MANOVA supone normalidad de los residuos dentro de "
+               "cada jornada, por eso también se reportan sobre los residuos con la covarianza combinada.")
+
+
+def _within_rows(a, alpha: float) -> list[list[str]]:
+    mah, mar = a.mahalanobis_within, a.mardia_within
+    ok = lambda p: "No se rechaza" if p >= alpha else "Se rechaza"  # noqa: E731
+    return [["Prueba", "Estadístico", "p", "Decisión"],
+            ["Mahalanobis (umbral χ²)", f"{fmt_num(mah.threshold, 2)}; atípicos: {mah.n_outliers} "
+             f"({fmt_num(mah.pct_outliers, 1)} %)", "-", "Informativo"],
+            ["Mardia asimetría (residuos)", fmt_num(mar.skewness_stat, 2), fmt_p(mar.skewness_p), ok(mar.skewness_p)],
+            ["Mardia curtosis (residuos)", fmt_num(mar.kurtosis_stat, 2), fmt_p(mar.kurtosis_p), ok(mar.kurtosis_p)]]
+
+
 def assumptions_section(results: PipelineResults) -> list:
     """Build section 4."""
     a, alpha = results.assumptions, results.metadata.alpha
@@ -52,4 +64,6 @@ def assumptions_section(results: PipelineResults) -> list:
         rows.append([f"Mardia asimetría, {label}", "-", fmt_p(ps), ok(ps)])
         rows.append([f"Mardia curtosis, {label}", "-", fmt_p(pk), ok(pk)])
     rows.append(["M de Box", f"χ² = {fmt_num(box.chi2, 2)} (gl = {box.df})", fmt_p(box.p_value), ok(box.p_value)])
-    return [para("4. Supuestos", H1), make_table(rows)]
+    return [para("4. Supuestos", H1), para("Método de la guía (covarianza total)", H2), make_table(rows),
+            para("Dentro de jornadas (residuos y covarianza combinada)", H2), make_table(_within_rows(a, alpha)),
+            para(WITHIN_NOTE)]

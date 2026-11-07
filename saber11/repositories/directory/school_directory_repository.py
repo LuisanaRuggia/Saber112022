@@ -1,23 +1,16 @@
 """Reader for the SED school directory of Bogotá (CKAN, latest GeoJSON resource)."""
 
 import json
-import re
 from pathlib import Path
 
 import pandas as pd
 import requests
 
-from saber11.core.errors.pipeline_errors import SourceUnavailableError
+from saber11.core.errors.pipeline_errors import DataValidationError, SourceUnavailableError
+from saber11.core.formatting.dane_codes import digits
 
 PACKAGE_URL = "https://datosabiertos.bogota.gov.co/api/3/action/package_show"
 PACKAGE_ID = "colegios-bogota-d-c"
-
-
-def digits(value) -> str:
-    """Return only the digits of a code, dropping a trailing '.0'."""
-    if value is None or (isinstance(value, float) and value != value):
-        return ""
-    return re.sub(r"\D", "", re.sub(r"\.0$", "", str(value).strip()))
 
 
 class SchoolDirectoryRepository:
@@ -36,6 +29,8 @@ class SchoolDirectoryRepository:
             return resp.json()
         except requests.RequestException as exc:
             raise SourceUnavailableError(f"{url} unreachable: {exc}") from exc
+        except ValueError as exc:
+            raise SourceUnavailableError(f"{url} answered a body that is not JSON") from exc
 
     def _latest_geojson(self) -> str:
         resources = self._json(PACKAGE_URL, {"id": PACKAGE_ID})["result"]["resources"]
@@ -49,7 +44,10 @@ class SchoolDirectoryRepository:
         """Return (dane_sede, dane_est, cod_localidad) and the URL used."""
         if self.local_path is not None:
             url = str(self.local_path)
-            data = json.loads(Path(self.local_path).read_text(encoding="utf-8"))
+            try:
+                data = json.loads(Path(self.local_path).read_text(encoding="utf-8"))
+            except ValueError as exc:
+                raise DataValidationError(f"{self.local_path} is not a valid GeoJSON file") from exc
         else:
             url = self._latest_geojson()
             data = self._json(url)

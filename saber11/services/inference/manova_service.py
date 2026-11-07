@@ -56,8 +56,8 @@ def _anova(frame: pd.DataFrame, score: str, shifts: list[str]) -> AnovaRow:
     )
 
 
-def run_manova(sample: pd.DataFrame, alpha: float = 0.05) -> ManovaResult:
-    """Test whether the score vector differs by shift; alpha is kept for interface symmetry."""
+def run_manova(sample: pd.DataFrame) -> ManovaResult:
+    """Test whether the score vector differs by shift, with Bonferroni follow-up ANOVAs."""
     frame = _in_scope(sample)
     shifts = [shift for shift in SHIFTS if shift in set(frame[SHIFT])]
     tests = _multivariate_tests(frame)

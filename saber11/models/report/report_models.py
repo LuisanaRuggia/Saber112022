@@ -9,6 +9,7 @@ from saber11.models.analysis.analysis_models import (
     ManovaResult,
     PcaResult,
 )
+from saber11.models.analysis.sensitivity_models import SensitivityResult
 from saber11.models.spatial.spatial_models import SpatialResult
 
 
@@ -46,4 +47,5 @@ class PipelineResults:
     hotelling: list[HotellingPair]
     pca: PcaResult
     spatial: SpatialResult
+    sensitivity: SensitivityResult
     conclusions: Conclusions

@@ -7,6 +7,7 @@ from saber11.models.analysis.analysis_models import (
     AnovaRow, AssumptionsResult, BoxMResult, DescriptiveResult, HotellingPair,
     MahalanobisResult, ManovaResult, MardiaResult, MultivariateTest, PcaResult,
 )
+from saber11.models.analysis.sensitivity_models import NatureSensitivity, OutlierSensitivity, SensitivityResult
 from saber11.models.dataset.dataset_models import SCORES, SHIFTS
 from saber11.models.report.report_models import PipelineResults, RunMetadata
 from saber11.models.spatial.spatial_models import DepartmentRanking, LocalityResult, LocalityTestResult, LocalityTestRow, SpatialResult
@@ -69,14 +70,28 @@ def _spatial(with_localities: bool) -> SpatialResult:
     return SpatialResult(DepartmentRanking(depts, 1, 3), loc)
 
 
-def build_results(significant: bool = True, with_localities: bool = True) -> PipelineResults:
+def _sensitivity(significant: bool, official_differs: bool) -> SensitivityResult:
+    profile = pd.DataFrame({"n": [1000, 2000, 3000, 4000], "n_official": [20, 1800, 2990, 3200]},
+                           index=list(SHIFTS))
+    profile["n_private"] = profile["n"] - profile["n_official"]
+    profile["share_private"] = profile["n_private"] / profile["n"]
+    index = pd.MultiIndex.from_tuples([("NO OFICIAL", "COMPLETA"), ("OFICIAL", "MAÑANA")])
+    means = pd.DataFrame({"n": [980, 1800], **{s: [62.0, 52.0] for s in SCORES}}, index=index)
+    official = _manova(significant and official_differs)
+    nature = NatureSensitivity(profile, means, list(SHIFTS), 400, official, _hotelling(significant and official_differs))
+    return SensitivityResult(OutlierSensitivity(12, _manova(significant)), nature)
+
+
+def build_results(significant: bool = True, with_localities: bool = True,
+                  official_differs: bool = False) -> PipelineResults:
     """Return a full synthetic PipelineResults."""
     desc = _descriptive(8.0 if significant else 0.1)
+    mardia = MardiaResult(1.2, 80.0, 0.001, 36.0, 3.0, 0.002, {g: (0.2, 0.3) for g in SHIFTS})
     assumptions = AssumptionsResult(
-        MahalanobisResult(14.4, 0.975, 15, 3.75, [1, 2]),
-        MardiaResult(1.2, 80.0, 0.001, 36.0, 3.0, 0.002, {g: (0.2, 0.3) for g in SHIFTS}),
-        BoxMResult(50.0, 45.0, 30, 0.238))
+        MahalanobisResult(14.4, 0.975, 15, 3.75, [1, 2]), mardia, BoxMResult(50.0, 45.0, 30, 0.238),
+        MahalanobisResult(14.4, 0.975, 12, 3.0, [1]), MardiaResult(0.9, 60.0, 0.01, 35.5, 1.0, 0.3, {}))
     manova, hot, pca, spatial = _manova(significant), _hotelling(significant), _pca(significant), _spatial(with_localities)
-    conclusions = draw_conclusions(desc, assumptions, manova, hot, pca, spatial, 0.05)
+    sensitivity = _sensitivity(significant, official_differs)
+    conclusions = draw_conclusions(desc, assumptions, manova, hot, pca, spatial, sensitivity, 0.05, "20224")
     meta = RunMetadata("20224", "api", "datos.gov.co", 10000, 100, 123, 0.05, "2026-11-06T10:00:00")
-    return PipelineResults(meta, desc, assumptions, manova, hot, pca, spatial, conclusions)
+    return PipelineResults(meta, desc, assumptions, manova, hot, pca, spatial, sensitivity, conclusions)

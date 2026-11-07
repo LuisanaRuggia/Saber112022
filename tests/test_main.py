@@ -19,12 +19,34 @@ def test_pipeline_error_exits_1(capsys):
     assert "error source_unavailable: socrata down" in capsys.readouterr().err
 
 
-def test_unexpected_error_exits_2_without_traceback(capsys):
+def test_unexpected_error_exits_2_without_traceback(capsys, monkeypatch):
+    monkeypatch.delenv("SABER11_DEBUG", raising=False)
     def boom(cfg):
         raise ValueError("secret detail")
     assert main(["run"], run_fn=boom) == 2
-    err = capsys.readouterr().err
-    assert "Traceback" not in err and "secret detail" not in err
+    out, err = capsys.readouterr()
+    assert "Traceback" not in err and "secret detail" not in err and "ValueError" in err
+    assert out == ""
+
+
+def test_debug_env_prints_traceback_to_stderr(capsys, monkeypatch):
+    monkeypatch.setenv("SABER11_DEBUG", "1")
+    def boom(cfg):
+        raise ValueError("secret detail")
+    assert main(["run"], run_fn=boom) == 2
+    out, err = capsys.readouterr()
+    assert "Traceback" in err and out == ""
+
+
+def test_stage_logs_go_to_stderr_and_stdout_has_only_the_pdf(capsys):
+    import logging
+
+    def fake_run(cfg):
+        logging.getLogger("saber11.pipeline").info('{"stage": "ingest"}')
+        return SimpleNamespace(pdf=Path("out/x.pdf"))
+    assert main(["run"], run_fn=fake_run) == 0
+    out, err = capsys.readouterr()
+    assert out.strip() == "out/x.pdf" and '"stage": "ingest"' in err
 
 
 def test_help_exits_zero(capsys):

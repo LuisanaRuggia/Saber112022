@@ -73,3 +73,21 @@ def test_group_too_small_raises():
     frame = pd.concat([frame[frame[SHIFT] != "TARDE"], frame[frame[SHIFT] == "TARDE"].head(4)])
     with pytest.raises(DataValidationError):
         check_assumptions(frame)
+
+
+def test_within_shift_checks_use_residuals(result, sample):
+    within = result.mahalanobis_within
+    assert within.quantile == 0.975 and within.threshold == result.mahalanobis.threshold
+    assert 0 < within.n_outliers < len(sample) * 0.1
+    assert result.mardia_within.by_group == {}
+
+
+def test_within_shift_checks_ignore_mean_differences():
+    base = synthetic(5, n=150)
+    shifted = base.copy()
+    for k, shift in enumerate(SHIFTS):
+        shifted.loc[shifted[SHIFT] == shift, list(SCORES)] += 25 * k
+    plain, moved = check_assumptions(base), check_assumptions(shifted)
+    assert moved.mahalanobis_within.outlier_index == plain.mahalanobis_within.outlier_index
+    assert moved.mardia_within.kurtosis_p == pytest.approx(plain.mardia_within.kurtosis_p)
+    assert moved.mardia.kurtosis_p != pytest.approx(plain.mardia.kurtosis_p)

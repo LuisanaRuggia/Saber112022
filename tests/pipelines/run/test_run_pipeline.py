@@ -51,3 +51,23 @@ def test_run_writes_all_outputs(tmp_path):
     assert art.sample_csv.exists() and art.departments_csv.exists() and art.shift_summary_csv.exists()
     assert art.localities_csv is not None and art.localities_csv.exists()
     assert art.run_dir == tmp_path / "20224"
+
+
+def test_run_leaves_no_partial_outputs_when_the_report_fails(tmp_path, monkeypatch):
+    import saber11.pipelines.run.run_pipeline as pipeline
+
+    def broken(results, path):
+        raise RuntimeError("reportlab exploded")
+    monkeypatch.setattr(pipeline, "render_pdf", broken)
+    with pytest.raises(RuntimeError):
+        run(PipelineConfig(output_dir=tmp_path), ingest_fn=_fake_ingest, directory_repo=FakeDirectory())
+    finals = [p for p in (tmp_path / "20224").rglob("*") if p.is_file() and not p.name.endswith(".tmp")]
+    assert finals == []
+
+
+def test_results_json_includes_sensitivity(tmp_path):
+    art = run(PipelineConfig(output_dir=tmp_path), ingest_fn=_fake_ingest, directory_repo=FakeDirectory())
+    data = json.loads(art.results_json.read_text(encoding="utf-8"))
+    assert data["sensitivity"]["official_only"]["manova"]["pillai"] > 0
+    assert "mahalanobis_within" in data["assumptions"]
+    assert not list((tmp_path / "20224").rglob("*.tmp"))

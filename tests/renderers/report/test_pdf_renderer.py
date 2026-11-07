@@ -58,3 +58,11 @@ def test_api_source_explains_why_this_period(tmp_path):
         r = replace(base, metadata=replace(base.metadata, source=source))
         text = " ".join(p.extract_text() for p in PdfReader(render_pdf(r, tmp_path / f"{source}.pdf")).pages)
         assert ("periodo más reciente con microdatos" in " ".join(text.split())) is expected
+
+
+def test_sensitivity_and_within_shift_tables_are_rendered(tmp_path):
+    text = " ".join(_text(render_pdf(build_results(), tmp_path / "r.pdf")).split())
+    for expected in ("Análisis de sensibilidad", "Solo colegios oficiales", "% privados",
+                     "Dentro de jornadas", "Mardia curtosis (residuos)", "un registro por estudiante",
+                     "ANOVA de Welch", "Solo departamentos con 30 estudiantes o más"):
+        assert expected in text

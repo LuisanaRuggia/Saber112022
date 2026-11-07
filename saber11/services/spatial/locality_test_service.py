@@ -1,4 +1,4 @@
-"""Compare Bogotá localities: ANOVA when normal, Kruskal-Wallis otherwise."""
+"""Compare Bogotá localities: ANOVA (or Welch's ANOVA) when normal, Kruskal-Wallis otherwise."""
 
 import pandas as pd
 from scipy import stats
@@ -8,6 +8,7 @@ from saber11.models.spatial.spatial_models import LocalityTestResult, LocalityTe
 
 GROUP = "cod_localidad"
 MIN_SHAPIRO_N = 3
+ANOVA, WELCH, KRUSKAL = "ANOVA", "ANOVA de Welch", "Kruskal-Wallis"
 
 
 def sample_by_locality(scored: pd.DataFrame, per_group: int, seed: int) -> pd.DataFrame:
@@ -23,12 +24,15 @@ def _rejections(groups: list[pd.Series], alpha: float) -> int:
     return sum(stats.shapiro(g).pvalue < threshold for g in groups)
 
 
-def _anova(groups: list[pd.Series]) -> tuple[float, float, float]:
-    f, p = stats.f_oneway(*groups)
+def _eta_squared(groups: list[pd.Series]) -> float:
     values = pd.concat(groups)
     ss_between = sum(len(g) * (g.mean() - values.mean()) ** 2 for g in groups)
-    ss_total = ((values - values.mean()) ** 2).sum()
-    return float(f), float(p), float(ss_between / ss_total)
+    return float(ss_between / ((values - values.mean()) ** 2).sum())
+
+
+def _anova(groups: list[pd.Series], equal_var: bool) -> tuple[float, float, float]:
+    f, p = stats.f_oneway(*groups, equal_var=equal_var)
+    return float(f), float(p), _eta_squared(groups)
 
 
 def _kruskal(groups: list[pd.Series]) -> tuple[float, float, float]:
@@ -37,16 +41,22 @@ def _kruskal(groups: list[pd.Series]) -> tuple[float, float, float]:
     return float(h), float(p), float(min(1.0, max(0.0, h / (n - 1))))
 
 
+def _choose(normal: bool, levene_p: float, alpha: float) -> str:
+    """Pick the test: Kruskal-Wallis if not normal, Welch if variances differ, else classic ANOVA."""
+    if not normal:
+        return KRUSKAL
+    return WELCH if levene_p < alpha else ANOVA
+
+
 def _compare(variable: str, groups: list[pd.Series], alpha: float, n_tests: int) -> LocalityTestRow:
     rejected = _rejections(groups, alpha)
-    normal = rejected == 0
-    stat, p, effect = _anova(groups) if normal else _kruskal(groups)
+    levene_p = float(stats.levene(*groups).pvalue)
+    test = _choose(rejected == 0, levene_p, alpha)
+    stat, p, effect = _kruskal(groups) if test == KRUSKAL else _anova(groups, equal_var=test == ANOVA)
     return LocalityTestRow(
-        variable=variable, normal=normal, n_rejected_normality=rejected,
-        levene_p=float(stats.levene(*groups).pvalue),
-        test="ANOVA" if normal else "Kruskal-Wallis", statistic=stat, p_value=p,
-        p_bonferroni=min(1.0, p * n_tests), effect_size=effect,
-        effect_label="η²" if normal else "ε²",
+        variable=variable, normal=rejected == 0, n_rejected_normality=rejected, levene_p=levene_p,
+        test=test, statistic=stat, p_value=p, p_bonferroni=min(1.0, p * n_tests),
+        effect_size=effect, effect_label="ε²" if test == KRUSKAL else "η²",
     )
 
 
@@ -62,4 +72,4 @@ def compare_localities(scored: pd.DataFrame, per_group: int = 100, seed: int = 1
     rows = [_compare(v, [g[v].reset_index(drop=True) for _, g in grouped], alpha, len(variables))
             for v in variables]
     return LocalityTestResult(rows=rows, per_group=per_group, seed=seed, n_sample=len(sample),
-                              n_groups=grouped.ngroups, excluded=excluded)
+                              n_groups=grouped.ngroups, excluded=excluded, alpha=alpha)

@@ -4,15 +4,25 @@ import pandas as pd
 
 from saber11.configs.pipeline.pipeline_config import PipelineConfig
 from saber11.core.errors.pipeline_errors import DataValidationError
-from saber11.models.dataset.dataset_models import DEPARTMENT, SCORES, SHIFT, SHIFTS, STUDENT_COLUMNS
+from saber11.models.dataset.dataset_models import (
+    DEPARTMENT, SCORES, SHIFT, SHIFTS, STUDENT_COLUMNS, STUDENT_ID)
 from saber11.models.dataset.ingestion_models import IngestionResult
 from saber11.repositories.dataicfes.dataicfes_repository import DataIcfesRepository
 from saber11.repositories.socrata.socrata_repository import SocrataRepository
 
 
+def drop_duplicate_students(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep one row per student id; rows without id fall back to whole-row duplicates."""
+    ids = df[STUDENT_ID].astype("string").str.strip()
+    has_id = ids.notna() & (ids != "")
+    with_id = df[has_id & ~ids.duplicated()]
+    without_id = df[~has_id].drop_duplicates()
+    return pd.concat([with_id, without_id]).sort_index()
+
+
 def clean_students(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize shift, keep study shifts, coerce scores and drop rows without scores."""
-    out = df.copy()
+    """Drop repeated students, keep study shifts, coerce scores and drop rows without scores."""
+    out = drop_duplicate_students(df)
     out[SHIFT] = out[SHIFT].astype("string").str.strip().str.upper()
     out = out[out[SHIFT].isin(SHIFTS)].copy()
     out[SHIFT] = out[SHIFT].astype(object)
@@ -27,19 +37,19 @@ def is_bogota(series: pd.Series) -> pd.Series:
 
 
 def department_means(national: pd.DataFrame) -> pd.DataFrame:
-    """Return n and mean scores per department from student rows."""
-    scores = national[list(SCORES)].apply(pd.to_numeric, errors="coerce")
-    grouped = scores.groupby(national[DEPARTMENT].values)
+    """Return n and mean scores per department, with the same filters as the Bogotá population."""
+    clean = clean_students(national)
+    grouped = clean[list(SCORES)].groupby(clean[DEPARTMENT].values)
     out = grouped.mean()
     out.insert(0, "n", grouped.size())
     out.index.name = "department"
     return out.reset_index()
 
 
-def draw_sample(bogota: pd.DataFrame, per_group: int, seed: int) -> pd.DataFrame:
+def draw_sample(bogota: pd.DataFrame, per_group: int, seed: int, shifts=SHIFTS) -> pd.DataFrame:
     """Draw per_group students from each shift, reproducibly."""
     parts = []
-    for shift in SHIFTS:
+    for shift in shifts:
         group = bogota[bogota[SHIFT] == shift]
         if len(group) < per_group:
             raise DataValidationError(
@@ -62,7 +72,8 @@ def ingest(config: PipelineConfig, socrata: SocrataRepository | None = None,
         departments = socrata.fetch_department_means(config.period)
         detail = f"API de datos.gov.co (dataset kgxf-xxbe), periodo {config.period}"
     else:
-        national = dataicfes_factory(config.dataicfes_path).read(config.period)
+        reader = dataicfes_factory(config.dataicfes_path, encoding=config.dataicfes_encoding)
+        national = reader.read(config.period)
         raw = national[is_bogota(national[DEPARTMENT])]
         departments = department_means(national)
         detail = f"archivo DataIcfes {config.dataicfes_path.name}, periodo {config.period}"

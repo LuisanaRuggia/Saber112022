@@ -59,3 +59,26 @@ def test_localities_too_small_for_shapiro_are_dropped():
     frame = pd.concat([_frame({"01": 0, "02": 3}, 120), _frame({"20": 0}, 2)], ignore_index=True)
     result = compare_localities(frame, per_group=100, seed=123)
     assert result.n_groups == 2 and result.excluded == ["20"]
+
+
+def _scaled(locality_scale: dict[str, float], n: int) -> pd.DataFrame:
+    """Normal localities with equal means and different spreads."""
+    frame = _frame(dict.fromkeys(locality_scale, 0.0), n)
+    for code, scale in locality_scale.items():
+        rows = frame["cod_localidad"] == code
+        frame.loc[rows, list(SCORES)] = 50 + (frame.loc[rows, list(SCORES)] - 50) * scale
+    return frame
+
+
+def test_normal_but_unequal_variances_use_welch():
+    result = compare_localities(_scaled({"01": 0.5, "02": 1.0, "03": 2.5}, 150), per_group=100, seed=123)
+    for row in result.rows:
+        assert row.normal and row.levene_p < 0.05
+        assert row.test == "ANOVA de Welch" and row.effect_label == "η²"
+
+
+def test_alpha_is_used_and_reported():
+    frame = _frame({"01": 0, "02": 0, "03": 0}, 150)
+    assert compare_localities(frame, alpha=0.01).alpha == 0.01
+    result = compare_localities(_scaled({"01": 0.8, "02": 1.0, "03": 1.25}, 150), alpha=1e-6)
+    assert all(row.test == "ANOVA" for row in result.rows)

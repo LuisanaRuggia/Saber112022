@@ -22,7 +22,7 @@ class LocalityTestRow:
     normal: bool             # True if no locality rejects Shapiro-Wilk (Bonferroni)
     n_rejected_normality: int
     levene_p: float
-    test: str                # "ANOVA" or "Kruskal-Wallis"
+    test: str                # "ANOVA", "ANOVA de Welch" or "Kruskal-Wallis"
     statistic: float
     p_value: float
     p_bonferroni: float
@@ -40,6 +40,7 @@ class LocalityTestResult:
     n_sample: int
     n_groups: int
     excluded: list[str] = field(default_factory=list)
+    alpha: float = 0.05
 
 
 @dataclass(frozen=True)

@@ -3,6 +3,7 @@
 import pandas as pd
 
 from saber11.core.errors.pipeline_errors import SourceUnavailableError
+from saber11.core.formatting.dane_codes import digits_series
 from saber11.models.dataset.dataset_models import DANE_SCHOOL, DANE_SITE, LOCALITIES, SCORES
 from saber11.models.spatial.spatial_models import DepartmentRanking, LocalityResult, SpatialResult
 from saber11.repositories.directory.school_directory_repository import SchoolDirectoryRepository
@@ -24,25 +25,20 @@ def rank_departments(departments: pd.DataFrame) -> DepartmentRanking:
     return DepartmentRanking(table=t, bogota_rank=bogota_rank, n_departments=len(t))
 
 
-def _digits(series: pd.Series) -> pd.Series:
-    text = series.astype("string").str.strip().str.replace(r"\.0$", "", regex=True)
-    return text.str.replace(r"\D", "", regex=True)
-
-
 def _lookup(directory: pd.DataFrame, key: str) -> dict:
-    d = pd.DataFrame({"k": _digits(directory[key]), "loc": directory["cod_localidad"].astype("string")})
+    d = pd.DataFrame({"k": digits_series(directory[key]), "loc": directory["cod_localidad"].astype("string")})
     d = d[(d["k"] != "") & d["loc"].notna() & (d["loc"] != "")]
     return d.drop_duplicates("k").set_index("k")["loc"].to_dict()
 
 
 def _assign_locality(bogota: pd.DataFrame, directory: pd.DataFrame) -> pd.Series:
-    by_site = _digits(bogota[DANE_SITE]).map(_lookup(directory, "dane_sede"))
-    by_school = _digits(bogota[DANE_SCHOOL]).map(_lookup(directory, "dane_est"))
+    by_site = digits_series(bogota[DANE_SITE]).map(_lookup(directory, "dane_sede"))
+    by_school = digits_series(bogota[DANE_SCHOOL]).map(_lookup(directory, "dane_est"))
     return by_site.fillna(by_school)
 
 
 def locality_results(bogota: pd.DataFrame, directory: pd.DataFrame, directory_source: str,
-                     per_group: int = 100, seed: int = 123) -> LocalityResult:
+                     per_group: int = 100, seed: int = 123, alpha: float = 0.05) -> LocalityResult:
     """Join students to localities through DANE codes and summarize each locality."""
     codes = _assign_locality(bogota, directory)
     scored = bogota[list(SCORES)].assign(cod_localidad=codes.values).dropna(subset=["cod_localidad"])
@@ -54,18 +50,19 @@ def locality_results(bogota: pd.DataFrame, directory: pd.DataFrame, directory_so
     t.insert(1, "localidad", t["cod_localidad"].map(LOCALITIES).fillna(t["cod_localidad"]))
     t = t.sort_values("avg_5", ascending=False).reset_index(drop=True)
     n = len(bogota)
-    tests = compare_localities(scored, per_group, seed) if t["n"].ge(3).sum() >= 2 else None
+    tests = compare_localities(scored, per_group, seed, alpha) if t["n"].ge(3).sum() >= 2 else None
     return LocalityResult(table=t, match_rate=len(scored) / n if n else 0.0,
                           n_students=n, directory_source=directory_source, tests=tests)
 
 
 def build_spatial(departments: pd.DataFrame, bogota: pd.DataFrame,
                   directory_repo: SchoolDirectoryRepository | None,
-                  per_group: int = 100, seed: int = 123) -> SpatialResult:
+                  per_group: int = 100, seed: int = 123, alpha: float = 0.05) -> SpatialResult:
     """Rank departments and, if the directory is reachable, summarize localities."""
     ranking = rank_departments(departments)
     try:
         directory, source = (directory_repo or SchoolDirectoryRepository()).fetch()
     except SourceUnavailableError:
         return SpatialResult(departments=ranking, localities=None)
-    return SpatialResult(departments=ranking, localities=locality_results(bogota, directory, source, per_group, seed))
+    localities = locality_results(bogota, directory, source, per_group, seed, alpha)
+    return SpatialResult(departments=ranking, localities=localities)

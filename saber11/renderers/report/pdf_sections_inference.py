@@ -3,6 +3,7 @@
 from saber11.core.formatting.spanish_numbers import fmt_num, fmt_p, fmt_p_clause
 from saber11.models.dataset.dataset_models import SCORE_LABELS, SCORES, SHIFT_LABELS
 from saber11.models.report.report_models import PipelineResults
+from saber11.renderers.report.pdf_sections_sensitivity import sensitivity_block
 from saber11.renderers.report.pdf_styles import H1, H2, make_table, para
 
 
@@ -59,4 +60,5 @@ def explanatory_section(results: PipelineResults) -> list:
             para("Cargas", H2), make_table(load),
             para("Medias del CP1 por jornada", H2), make_table(cp1),
             para(f"ANOVA del CP1: F = {fmt_num(pca.cp1_f, 2)}, {fmt_p_clause(pca.cp1_p)}, "
-                 f"η² = {fmt_num(pca.cp1_eta_squared)}.")]
+                 f"η² = {fmt_num(pca.cp1_eta_squared)}."),
+            *sensitivity_block(results)]

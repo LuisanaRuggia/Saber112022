@@ -1,12 +1,14 @@
 """Canonical dataset vocabulary shared by every layer."""
 
 PERIOD = "periodo"
+STUDENT_ID = "estu_consecutivo"
 DEPARTMENT = "cole_depto_ubicacion"
 SHIFT = "cole_jornada"
 DANE_SITE = "cole_cod_dane_sede"
 DANE_SCHOOL = "cole_cod_dane_establecimiento"
 NATURE = "cole_naturaleza"
 LOCALITY = "localidad"
+OFFICIAL = "OFICIAL"
 
 SCORES = (
     "punt_matematicas",
@@ -24,12 +26,21 @@ SCORE_LABELS = {
     "punt_ingles": "Inglés",
 }
 
+SCORE_SHORT_LABELS = {
+    "punt_matematicas": "Mat.",
+    "punt_lectura_critica": "Lect.",
+    "punt_c_naturales": "Nat.",
+    "punt_sociales_ciudadanas": "Soc.",
+    "punt_ingles": "Ing.",
+}
+
 # Shifts compared in the study; NOCHE and SABATINA (adult education) are excluded.
 SHIFTS = ("COMPLETA", "MAÑANA", "TARDE", "UNICA")
 
 SHIFT_LABELS = {"COMPLETA": "Completa", "MAÑANA": "Mañana", "TARDE": "Tarde", "UNICA": "Única"}
 
-STUDENT_COLUMNS = (PERIOD, DEPARTMENT, SHIFT, DANE_SITE, DANE_SCHOOL, NATURE, *SCORES)
+# The source repeats some students; STUDENT_ID lets ingestion keep one row per student.
+STUDENT_COLUMNS = (PERIOD, STUDENT_ID, DEPARTMENT, SHIFT, DANE_SITE, DANE_SCHOOL, NATURE, *SCORES)
 
 # Official codes of Bogotá's 20 localities (COD_LOCA in the SED school directory).
 LOCALITIES = {

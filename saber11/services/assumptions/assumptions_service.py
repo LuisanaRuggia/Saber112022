@@ -4,29 +4,14 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from saber11.core.errors.pipeline_errors import DataValidationError
 from saber11.models.analysis.analysis_models import (
     AssumptionsResult,
     BoxMResult,
     MahalanobisResult,
     MardiaResult,
 )
-from saber11.models.dataset.dataset_models import SCORES, SHIFT, SHIFTS
-
-
-def _groups(sample: pd.DataFrame) -> dict[str, np.ndarray]:
-    """Split the scores by shift, requiring more rows than variables per group."""
-    groups = {
-        shift: sample.loc[sample[SHIFT] == shift, list(SCORES)].to_numpy(float)
-        for shift in SHIFTS
-        if (sample[SHIFT] == shift).any()
-    }
-    for shift, values in groups.items():
-        if len(values) <= len(SCORES):
-            raise DataValidationError(f"Shift {shift} has {len(values)} rows; need more than {len(SCORES)}")
-    if not groups:
-        raise DataValidationError("No compared shifts present in sample")
-    return groups
+from saber11.models.dataset.dataset_models import SCORES
+from saber11.services.groups.shift_groups import split_by_shift, within_residuals
 
 
 def _squared_distances(values: np.ndarray, covariance: np.ndarray) -> np.ndarray:
@@ -35,9 +20,15 @@ def _squared_distances(values: np.ndarray, covariance: np.ndarray) -> np.ndarray
     return np.einsum("ij,jk,ik->i", centered, np.linalg.inv(covariance), centered)
 
 
-def mahalanobis(values: np.ndarray, quantile: float, positions: np.ndarray) -> MahalanobisResult:
-    """Flag rows whose squared distance exceeds the chi-square quantile."""
-    distances = _squared_distances(values, np.cov(values, rowvar=False, ddof=1))
+def mahalanobis(values: np.ndarray, quantile: float, positions: np.ndarray,
+                covariance: np.ndarray | None = None) -> MahalanobisResult:
+    """Flag rows whose squared distance exceeds the chi-square quantile.
+
+    Without `covariance` the total sample covariance is used, as in the course guide.
+    """
+    if covariance is None:
+        covariance = np.cov(values, rowvar=False, ddof=1)
+    distances = _squared_distances(values, covariance)
     threshold = float(stats.chi2.ppf(quantile, values.shape[1]))
     outliers = np.flatnonzero(distances > threshold)
     return MahalanobisResult(
@@ -65,7 +56,7 @@ def _mardia_stats(values: np.ndarray) -> tuple[float, float, float, float, float
 
 
 def mardia(values: np.ndarray, groups: dict[str, np.ndarray]) -> MardiaResult:
-    """Run Mardia's tests on the whole sample and on each group."""
+    """Run Mardia's tests on `values` and on each group (pass {} to skip the groups)."""
     b1p, skew_stat, skew_p, b2p, kurt_stat, kurt_p = _mardia_stats(values)
     by_group = {}
     for shift, group in groups.items():
@@ -89,16 +80,16 @@ def box_m(groups: dict[str, np.ndarray]) -> BoxMResult:
 
 
 def check_assumptions(sample: pd.DataFrame, quantile: float = 0.975) -> AssumptionsResult:
-    """Run Mahalanobis outlier detection, Mardia's tests and Box's M."""
-    groups = _groups(sample)
-    if len(groups) < 2:
-        raise DataValidationError("Box's M needs at least two shifts")
+    """Run Mahalanobis, Mardia and Box's M, both as in the guide and on within-shift residuals."""
+    groups = split_by_shift(sample, "Box's M")
     values = np.vstack(list(groups.values()))
     # Outlier indices must be positions in the caller's frame, including excluded rows.
-    mask = sample[SHIFT].isin(list(groups)).to_numpy()
-    in_scope = sample.loc[mask, list(SCORES)].to_numpy(float)
+    residuals, positions, pooled = within_residuals(sample)
+    in_scope = sample.iloc[positions][list(SCORES)].to_numpy(float)
     return AssumptionsResult(
-        mahalanobis=mahalanobis(in_scope, quantile, np.flatnonzero(mask)),
+        mahalanobis=mahalanobis(in_scope, quantile, positions),
         mardia=mardia(values, groups),
         box_m=box_m(groups),
+        mahalanobis_within=mahalanobis(residuals, quantile, positions, pooled),
+        mardia_within=mardia(residuals, {}),
     )

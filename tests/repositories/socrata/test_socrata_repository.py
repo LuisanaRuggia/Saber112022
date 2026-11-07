@@ -63,12 +63,33 @@ def test_client_error_is_not_retried():
 
 
 def test_fetch_department_means_numeric_and_renamed():
-    payload = [{"cole_depto_ubicacion": "BOGOTÁ", "n": "152584",
-                **{c: "250.5" for c in SCORES}}]
+    payload = [{"cole_depto_ubicacion": "BOGOTÁ", "n": "70538",
+                **{f"mean_{c}": "250.5" for c in SCORES}}]
     r, s, _ = repo([FakeResponse(payload)])
     df = r.fetch_department_means("20224")
     assert list(df.columns) == ["department", "n", *SCORES]
-    assert df["n"].iloc[0] == 152584 and df["punt_ingles"].iloc[0] == 250.5
+    assert df["n"].iloc[0] == 70538 and df["punt_ingles"].iloc[0] == 250.5
     p = s.calls[0]["params"]
-    assert p["$group"] == "cole_depto_ubicacion" and p["$where"] == "periodo='20224'"
+    assert p["$group"] == "cole_depto_ubicacion" and p["$where"].startswith("periodo='20224'")
+    assert "count(distinct estu_consecutivo)" in p["$select"]
+    assert "'MAÑANA'" in p["$where"] and "NOCHE" not in p["$where"] and "punt_ingles IS NOT NULL" in p["$where"]
     assert isinstance(df, pd.DataFrame)
+
+
+def test_fetch_bogota_selects_student_id():
+    r, s, _ = repo([FakeResponse([])])
+    r.fetch_bogota("20224")
+    assert "estu_consecutivo" in s.calls[0]["params"]["$select"]
+
+
+class NotJson(FakeResponse):
+    def json(self):
+        raise ValueError("Expecting value")
+
+
+def test_non_json_body_is_retried_then_reported():
+    r, s, sleeps = repo([NotJson(), FakeResponse([])])
+    assert r.fetch_bogota("20224").empty and len(s.calls) == 2
+    r, _, _ = repo([NotJson()] * 2, max_retries=2)
+    with pytest.raises(SourceUnavailableError, match="not JSON"):
+        r.fetch_bogota("20224")

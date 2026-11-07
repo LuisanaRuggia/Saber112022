@@ -6,24 +6,9 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from saber11.core.errors.pipeline_errors import DataValidationError
 from saber11.models.analysis.analysis_models import HotellingPair
-from saber11.models.dataset.dataset_models import SCORES, SHIFT, SHIFTS
-
-
-def _groups(sample: pd.DataFrame) -> dict[str, np.ndarray]:
-    """Split scores by present shift, requiring more rows than variables."""
-    groups = {
-        shift: sample.loc[sample[SHIFT] == shift, list(SCORES)].to_numpy(float)
-        for shift in SHIFTS
-        if (sample[SHIFT] == shift).any()
-    }
-    if len(groups) < 2:
-        raise DataValidationError("Hotelling T² needs at least two shifts")
-    for shift, values in groups.items():
-        if len(values) <= len(SCORES):
-            raise DataValidationError(f"Shift {shift} has {len(values)} rows; need more than {len(SCORES)}")
-    return groups
+from saber11.models.dataset.dataset_models import SCORES
+from saber11.services.groups.shift_groups import split_by_shift
 
 
 def _t2(first: np.ndarray, second: np.ndarray) -> tuple[float, np.ndarray]:
@@ -55,8 +40,8 @@ def _pair(name_a: str, first: np.ndarray, name_b: str, second: np.ndarray, n_pai
     )
 
 
-def pairwise_hotelling(sample: pd.DataFrame, alpha: float = 0.05) -> list[HotellingPair]:
-    """Compare every pair of shifts; alpha is kept for interface symmetry."""
-    groups = _groups(sample)
+def pairwise_hotelling(sample: pd.DataFrame) -> list[HotellingPair]:
+    """Compare every pair of shifts with Bonferroni over the number of pairs."""
+    groups = split_by_shift(sample, "Hotelling T²")
     pairs = list(combinations(groups, 2))
     return [_pair(a, groups[a], b, groups[b], len(pairs)) for a, b in pairs]

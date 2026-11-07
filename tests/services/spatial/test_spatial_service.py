@@ -79,3 +79,22 @@ def test_locality_results_include_statistical_tests():
                               "dane_est": ["111001000001", "111001000002"], "cod_localidad": ["01", "02"]})
     result = locality_results(bogota, directory, "local", per_group=100, seed=123)
     assert result.tests is not None and result.tests.n_sample == 200
+
+
+def test_alpha_reaches_the_locality_tests():
+    import numpy as np
+    from saber11.models.dataset.dataset_models import DANE_SCHOOL, DANE_SITE
+
+    rng = np.random.default_rng(3)
+    frame = pd.DataFrame(rng.normal(50, 10, size=(60, 5)), columns=list(SCORES))
+    frame[DANE_SITE] = ["111001000001"] * 30 + ["111001000002"] * 30
+    frame[DANE_SCHOOL] = frame[DANE_SITE]
+    directory = pd.DataFrame({"dane_sede": ["111001000001", "111001000002"],
+                              "dane_est": ["111001000001", "111001000002"], "cod_localidad": ["01", "02"]})
+
+    class Dir:
+        def fetch(self):
+            return directory, "local"
+
+    result = build_spatial(departments(), frame, Dir(), per_group=30, seed=1, alpha=0.01)
+    assert result.localities.tests.alpha == 0.01

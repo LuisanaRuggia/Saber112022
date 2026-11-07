@@ -6,7 +6,8 @@ import pandas as pd
 import requests
 
 from saber11.core.errors.pipeline_errors import SourceUnavailableError
-from saber11.models.dataset.dataset_models import DEPARTMENT, PERIOD, SCORES, STUDENT_COLUMNS
+from saber11.models.dataset.dataset_models import (
+    DEPARTMENT, PERIOD, SCORES, SHIFT, SHIFTS, STUDENT_COLUMNS, STUDENT_ID)
 
 BASE_URL = "https://www.datos.gov.co/resource/kgxf-xxbe.json"
 RETRY_STATUS = {429}
@@ -41,7 +42,11 @@ class SocrataRepository:
                 last = f"{type(exc).__name__}: {exc}"
                 continue
             if resp.status_code == 200:
-                return resp.json()
+                try:
+                    return resp.json()
+                except ValueError:
+                    last = "HTTP 200 with a body that is not JSON"
+                    continue
             last = f"HTTP {resp.status_code}"
             if resp.status_code not in RETRY_STATUS and resp.status_code < 500:
                 break
@@ -62,11 +67,20 @@ class SocrataRepository:
         return pd.DataFrame(rows).reindex(columns=list(STUDENT_COLUMNS))
 
     def fetch_department_means(self, period: str) -> pd.DataFrame:
-        """Return n and mean scores per department for the period."""
-        means = ", ".join(f"avg({c}::number) AS {c}" for c in SCORES)
-        page = self._get({"$select": f"{DEPARTMENT}, count(*) AS n, {means}",
-                          "$where": f"{PERIOD}='{period}'", "$group": DEPARTMENT, "$limit": 100})
-        df = pd.DataFrame(page).rename(columns={DEPARTMENT: "department"})
+        """Return unique students and mean scores per department, filtered like the Bogotá population.
+
+        The dataset repeats most students as identical rows. `n` counts distinct student ids;
+        the means are computed over rows, which equals the per-student mean when copies are exact.
+        """
+        # Aliases must differ from column names because WHERE also filters on the scores.
+        means = ", ".join(f"avg({c}::number) AS mean_{c}" for c in SCORES)
+        shifts = ", ".join(f"'{s}'" for s in SHIFTS)
+        scored = " AND ".join(f"{c} IS NOT NULL" for c in SCORES)
+        where = f"{PERIOD}='{period}' AND upper({SHIFT}) IN ({shifts}) AND {scored}"
+        page = self._get({"$select": f"{DEPARTMENT}, count(distinct {STUDENT_ID}) AS n, {means}",
+                          "$where": where, "$group": DEPARTMENT, "$limit": 100})
+        renames = {DEPARTMENT: "department", **{f"mean_{c}": c for c in SCORES}}
+        df = pd.DataFrame(page).rename(columns=renames)
         df = df.reindex(columns=["department", "n", *SCORES])
         df[["n", *SCORES]] = df[["n", *SCORES]].apply(pd.to_numeric, errors="coerce")
         return df

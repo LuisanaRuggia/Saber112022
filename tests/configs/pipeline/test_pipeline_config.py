@@ -25,6 +25,7 @@ def test_dataicfes_requires_existing_file(tmp_path):
         {"SABER11_PERIOD": "2025"},
         {"SABER11_SAMPLE_PER_GROUP": "cien"},
         {"SABER11_SEED": "0"},
+        {"SABER11_DATAICFES_ENCODING": "klingon"},
     ],
 )
 def test_invalid_values_fail_at_load(env):
@@ -43,3 +44,8 @@ def test_directory_path_is_optional_but_must_exist(tmp_path):
     geo = tmp_path / "colegios.geojson"
     geo.write_text("{}")
     assert load_config({"SABER11_DIRECTORY_PATH": str(geo)}).directory_path == geo
+
+
+def test_dataicfes_encoding_is_optional():
+    assert load_config({}).dataicfes_encoding is None
+    assert load_config({"SABER11_DATAICFES_ENCODING": "latin-1"}).dataicfes_encoding == "latin-1"

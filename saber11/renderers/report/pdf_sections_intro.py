@@ -36,19 +36,25 @@ def methodology(results: PipelineResults) -> list:
     a = fmt_num(m.alpha, 2)
     sources = [f"Fuente de datos: {m.source_detail}.",
                "Filtros: colegios de Bogotá; jornadas Completa, Mañana, Tarde y Única "
-               "(se excluyen Noche y Sabatina); sin puntajes faltantes."]
+               "(se excluyen Noche y Sabatina); sin puntajes faltantes.",
+               "Registros repetidos: la fuente repite filas idénticas de un mismo estudiante; se conserva un "
+               "registro por estudiante (estu_consecutivo). Los conteos de población son de estudiantes únicos."]
     if m.source == "api":
         sources.append("Periodo: es el periodo más reciente con microdatos por estudiante en datos abiertos "
                        "(datos.gov.co). Los periodos 2023 a 2025 solo se distribuyen por DataIcfes, con registro; "
                        "el pipeline puede procesarlos sin cambios en el código cuando se disponga del archivo.")
     design = [f"Muestra estratificada por jornada: {m.sample_per_group} estudiantes por grupo, semilla {m.seed}."]
     tests = ["Estadística descriptiva (medias, desviaciones, covarianzas, correlaciones).",
-             "Distancia de Mahalanobis (atípicos), normalidad multivariada de Mardia y M de Box.",
+             "Distancia de Mahalanobis (atípicos), normalidad multivariada de Mardia y M de Box; Mahalanobis y "
+             "Mardia se calculan como en la guía y también sobre los residuos dentro de cada jornada.",
              f"MANOVA (Pillai, Wilks, Hotelling-Lawley, Roy) con α = {a}.",
              "ANOVA por prueba y T² de Hotelling por pares, con corrección de Bonferroni "
              f"(α dividido por el número de comparaciones; α global = {a}).",
              "Análisis de componentes principales sobre la matriz de correlación y ANOVA del CP1.",
-             "Ranking de departamentos y resultados por localidad."]
+             "Sensibilidad: MANOVA sin los atípicos intra-jornada y MANOVA y T² de Hotelling solo con colegios "
+             "oficiales, para separar la jornada de la naturaleza del colegio.",
+             "Ranking de departamentos y resultados por localidad (Shapiro-Wilk; ANOVA, ANOVA de Welch o "
+             "Kruskal-Wallis según los supuestos)."]
     return [para("2. Datos y metodología", H1), para("Fuentes y filtros", H2), *[bullet(s) for s in sources],
             para("Diseño de la muestra", H2), *[bullet(s) for s in design],
             para("Pruebas aplicadas", H2), *[bullet(s) for s in tests]]

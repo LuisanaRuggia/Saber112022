@@ -26,6 +26,9 @@ saber11/
   services/inference/hotelling_service.py    # pairwise Hotelling T² (Bonferroni)
   services/pca/pca_service.py                # PCA on correlation + CP1 ANOVA
   services/spatial/spatial_service.py        # department ranking, locality join
+  services/spatial/locality_test_service.py  # Shapiro-Wilk -> ANOVA / Welch / Kruskal-Wallis
+  services/groups/shift_groups.py           # per-shift matrices and within-shift residuals
+  services/sensitivity/sensitivity_service.py # MANOVA without outliers and public schools only
   services/conclusions/conclusions_service.py # narrative findings from results
   renderers/report/pdf_renderer.py           # ReportLab: tables + text, no figures
   pipelines/run/run_pipeline.py              # orchestration, writes outputs
@@ -46,6 +49,15 @@ tests/  (mirrors saber11/)
 | Datos 2025 | Archivo local de DataIcfes con adaptador | Las tablas públicas del Icfes son agregadas, sin jornada: no sirven para MANOVA |
 | Directorio de colegios | API CKAN → recurso GeoJSON más reciente | URL fija del xlsx: ya dio 404 |
 | Localidad | `COD_LOCA` del directorio + catálogo oficial de 20 localidades | Nombres normalizados: frágiles |
+| Registros repetidos | Un registro por `estu_consecutivo` (el periodo 20224 de la API trae 1.065.888 filas y 532.792 estudiantes; las copias son idénticas). En la API, los departamentos cuentan `count(distinct estu_consecutivo)` | Contar filas: duplica las poblaciones |
+| Ranking de departamentos | Mismos filtros que Bogotá (4 jornadas, sin puntajes faltantes, estudiantes únicos) | Todas las filas: mezcla Noche y Sabatina, que se excluyen en Bogotá |
+| Atípicos y Mardia | Se reportan dos versiones: la de la guía (covarianza total, reproduce sus 15 atípicos) y la intra-jornada (residuos y covarianza combinada, que es el supuesto del MANOVA) | Solo la de la guía: confunde diferencias entre jornadas con no normalidad |
+| Naturaleza del colegio | Sensibilidad: MANOVA y Hotelling con muestra estratificada solo de colegios oficiales; tabla de % privados por jornada | Ignorarla: Completa es ~99 % privada, el efecto de jornada queda confundido |
+| Sensibilidad a atípicos | MANOVA repetido sin los atípicos intra-jornada | Eliminarlos del análisis principal: cambia la muestra de la guía |
+| Prueba entre localidades | Shapiro-Wilk por localidad (Bonferroni); normal + Levene no rechaza → ANOVA; normal + Levene rechaza → ANOVA de Welch; no normal → Kruskal-Wallis. α de la configuración | ANOVA clásico con varianzas distintas: infla el error tipo I |
+| Lectura DataIcfes | Codificación detectada (UTF-8 o Latin-1, o `SABER11_DATAICFES_ENCODING`); el separador `¬` se cambia por `\x1f` al leer para usar el parser C (~27 veces más rápido) | `engine="python"`: muy lento con millones de filas |
+| Salidas | Se escriben con sufijo `.tmp` y se mueven al final: si algo falla no quedan archivos a medias | Escritura directa: deja `results.json` sin PDF |
+| CLI | stdout solo lleva la ruta del PDF; las etapas y los errores van a stderr; `SABER11_DEBUG=1` muestra el traceback | Mezclar logs JSON y la ruta en stdout |
 
 ## Configuración (variables de entorno)
 
@@ -54,6 +66,9 @@ tests/  (mirrors saber11/)
 | `SABER11_SOURCE` | `api` | `api` o `dataicfes` |
 | `SABER11_PERIOD` | `20224` | Periodo (texto) |
 | `SABER11_DATAICFES_PATH` | — | Obligatoria si la fuente es `dataicfes` |
+| `SABER11_DATAICFES_ENCODING` | — | Codificación del archivo; si falta se detecta (UTF-8 o Latin-1) |
+| `SABER11_DIRECTORY_PATH` | — | GeoJSON local del directorio de colegios |
+| `SABER11_DEBUG` | — | Con `1`, muestra el traceback de errores inesperados |
 | `SABER11_SAMPLE_PER_GROUP` | `100` | Tamaño por jornada |
 | `SABER11_SEED` | `123` | Semilla |
 | `SABER11_OUTPUT_DIR` | `output` | Carpeta de salida |
@@ -69,15 +84,15 @@ tests/  (mirrors saber11/)
 | D-04 | Repositorio de directorio | Resuelve el recurso GeoJSON más reciente vía CKAN; devuelve dane_sede, dane_est, cod_localidad |
 | D-05 | Ingesta y muestra | Población Bogotá limpia + muestra estratificada reproducible |
 | D-06 | Descriptivo | Coincide con pandas en la fixture |
-| D-07 | Supuestos | Fixture 2022: 15 atípicos; Box p ≈ 0,238; Mardia rechaza |
+| D-07 | Supuestos | Fixture 2022: 15 atípicos (método de la guía); Box p ≈ 0,238; Mardia rechaza; versión intra-jornada inmune a diferencias de medias |
 | D-08 | MANOVA + ANOVAs | Fixture 2022: Pillai ≈ 0,202; η² ≈ 0,067 |
 | D-09 | Hotelling por pares | Fixture 2022: Completa difiere de las otras 3 (p_bonf < 0,001) y las otras 3 no difieren entre sí |
 | D-10 | PCA + ANOVA CP1 | Fixture 2022: CP1 ≈ 76,5 %, cargas entre 0,84 y 0,91 |
 | D-11 | Espacial | Ranking de departamentos; tabla de localidades con tasa de cruce |
 | D-12 | Conclusiones | Texto derivado de los resultados, sin números escritos a mano |
-| D-13 | Informe PDF | Abre, sin figuras, contiene todas las secciones de HU-07 |
+| D-13 | Informe PDF | Abre, sin figuras; portada, metodología, descriptivo, supuestos, explicativo, sensibilidad, espacial, conclusiones y fuentes |
 | D-14 | Orquestación + CLI | `python -m saber11 run` produce CSV, JSON y PDF |
-| D-15 | Imagen Docker | Construye, no-root, HEALTHCHECK (import del paquete), salida por volumen |
+| D-15 | Imagen Docker | Construye, no-root, salida por volumen; sin HEALTHCHECK porque es un proceso batch que termina |
 | D-16 | README | Instalación, configuración, cómo obtener los datos de DataIcfes, ejecución, resultados |
 
 ## Imagen

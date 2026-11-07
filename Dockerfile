@@ -20,6 +20,5 @@ ENV PATH="/app/.venv/bin:$PATH" \
     SABER11_OUTPUT_DIR=/app/output
 USER saber11
 VOLUME ["/app/output", "/data"]
-HEALTHCHECK CMD python -c "import saber11"
 ENTRYPOINT ["python", "-m", "saber11"]
 CMD ["run"]

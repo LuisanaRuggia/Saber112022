@@ -25,15 +25,6 @@ def _manova_finding(manova: ManovaResult, alpha: float) -> str:
     return f"El MANOVA {verb} la igualdad de vectores de medias entre jornadas {manova_clause(manova)}: {tail}"
 
 
-def _anova_finding(manova: ManovaResult, alpha: float) -> str:
-    sig = [SCORE_LABELS[a.score] for a in manova.anovas if a.p_bonferroni < alpha]
-    if not sig:
-        return ("Ninguna de las cinco pruebas muestra diferencias significativas entre jornadas "
-                "tras la corrección de Bonferroni.")
-    return ("Tras la corrección de Bonferroni, los ANOVA son significativos en: "
-            + ", ".join(sig) + f" ({len(sig)} de {len(manova.anovas)}).")
-
-
 def _hotelling_findings(pairs: list[HotellingPair], alpha: float) -> list[str]:
     diff = differing_pairs(pairs, alpha)
     same = [f"{shift_label(p.group_a)} y {shift_label(p.group_b)}" for p in pairs if p.p_bonferroni >= alpha]
@@ -123,7 +114,7 @@ def draw_conclusions(descriptive: DescriptiveResult, assumptions: AssumptionsRes
                      hotelling: list[HotellingPair], pca: PcaResult, spatial: SpatialResult,
                      sensitivity: SensitivityResult, alpha: float, period: str) -> Conclusions:
     """Build the headline, findings and caveats from the results."""
-    findings = [_manova_finding(manova, alpha), _anova_finding(manova, alpha),
+    findings = [_manova_finding(manova, alpha),
                 *_hotelling_findings(hotelling, alpha), _gap_finding(descriptive),
                 *nature_findings(sensitivity.official_only, alpha),
                 outlier_finding(sensitivity, manova.pillai_p < alpha, alpha),

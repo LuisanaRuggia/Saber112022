@@ -10,6 +10,9 @@ COPY saber11 ./saber11
 RUN uv sync --frozen --no-dev
 
 FROM python:3.12-slim AS runtime
+# Liberation Sans has Arial's metrics; the report uses it when Arial itself is not installed.
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
 RUN useradd --create-home --uid 10001 saber11 \
     && mkdir -p /app/output /data \
     && chown -R saber11:saber11 /app /data

@@ -10,6 +10,7 @@ dependencies = [
     "statsmodels>=0.14.2",
     "requests>=2.32",
     "reportlab>=4.2",
+    "matplotlib>=3.9",
 ]
 
 [dependency-groups]

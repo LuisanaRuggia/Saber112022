@@ -22,7 +22,7 @@ saber11/
   services/ingestion/ingestion_service.py    # Bogotá population, departments, sample
   services/descriptive/descriptive_service.py
   services/assumptions/assumptions_service.py   # Mahalanobis, Mardia, Box's M
-  services/inference/manova_service.py       # MANOVA + follow-up ANOVAs (Bonferroni)
+  services/inference/manova_service.py       # MANOVA (Pillai, Wilks, Hotelling-Lawley, Roy)
   services/inference/hotelling_service.py    # pairwise Hotelling T² (Bonferroni)
   services/pca/pca_service.py                # PCA on correlation + CP1 ANOVA
   services/spatial/spatial_service.py        # department ranking, locality join
@@ -30,7 +30,8 @@ saber11/
   services/groups/shift_groups.py           # per-shift matrices and within-shift residuals
   services/sensitivity/sensitivity_service.py # MANOVA without outliers and public schools only
   services/conclusions/conclusions_service.py # narrative findings from results
-  renderers/report/pdf_renderer.py           # ReportLab: tables + text, no figures
+  renderers/report/pdf_renderer.py           # ReportLab: tables, text and figures
+  renderers/charts/*_charts.py               # matplotlib, fixed color per shift, PNG bytes
   pipelines/run/run_pipeline.py              # orchestration, writes outputs
   __main__.py                                # CLI: python -m saber11 run
 tests/  (mirrors saber11/)
@@ -45,7 +46,7 @@ tests/  (mirrors saber11/)
 | MANOVA | `statsmodels.MANOVA` | Implementación propia: más riesgo sin beneficio |
 | Mardia, Box M, Hotelling | Implementación propia con numpy/scipy, verificada por pruebas | `pingouin`: dependencia pesada y Box M sin corrección uniforme |
 | PCA | Eigen-descomposición de la matriz de correlación (numpy) | sklearn sobre datos estandarizados: equivalente, pero con menos control de las cargas |
-| PDF | ReportLab (tablas y texto) | WeasyPrint: requiere librerías de sistema; LaTeX: pesado en la imagen |
+| PDF | ReportLab (tablas y texto) + matplotlib (gráficos a color con paleta validada para daltonismo; cada jornada siempre con el mismo color; incrustados como PNG) | WeasyPrint: requiere librerías de sistema; LaTeX: pesado en la imagen |
 | Datos 2025 | Archivo local de DataIcfes con adaptador | Las tablas públicas del Icfes son agregadas, sin jornada: no sirven para MANOVA |
 | Directorio de colegios | API CKAN → recurso GeoJSON más reciente | URL fija del xlsx: ya dio 404 |
 | Localidad | `COD_LOCA` del directorio + catálogo oficial de 20 localidades | Nombres normalizados: frágiles |
@@ -90,7 +91,7 @@ tests/  (mirrors saber11/)
 | D-10 | PCA + ANOVA CP1 | Fixture 2022: CP1 ≈ 76,5 %, cargas entre 0,84 y 0,91 |
 | D-11 | Espacial | Ranking de departamentos; tabla de localidades con tasa de cruce |
 | D-12 | Conclusiones | Texto derivado de los resultados, sin números escritos a mano |
-| D-13 | Informe PDF | Abre, sin figuras; portada, metodología, descriptivo, supuestos, explicativo, sensibilidad, espacial, conclusiones y fuentes |
+| D-13 | Informe PDF | Abre; tablas en blanco y negro y gráficos a color, Arial (o Liberation Sans), texto justificado, sin nombres de participantes; portada, método breve, descriptivo, supuestos, explicativo, sensibilidad, espacial, conclusiones y fuentes |
 | D-14 | Orquestación + CLI | `python -m saber11 run` produce CSV, JSON y PDF |
 | D-15 | Imagen Docker | Construye, no-root, salida por volumen; sin HEALTHCHECK porque es un proceso batch que termina |
 | D-16 | README | Instalación, configuración, cómo obtener los datos de DataIcfes, ejecución, resultados |

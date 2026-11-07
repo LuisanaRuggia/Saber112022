@@ -3,15 +3,15 @@
 Pipeline de datos que compara el rendimiento en las cinco pruebas del Saber 11 (Matemáticas,
 Lectura Crítica, Ciencias Naturales, Sociales y Ciudadanas, Inglés) entre las jornadas
 **Completa, Mañana, Tarde y Única** en Bogotá. Hace la ingesta, el análisis descriptivo, el
-explicativo (MANOVA y PCA) y el espacial, y genera un **informe PDF** con los resultados y las
-conclusiones (solo tablas y texto, sin figuras).
+explicativo (MANOVA y PCA) y el espacial, y genera un **informe PDF** con el resumen de resultados:
+tablas y matrices en blanco y negro, gráficos a color (paleta apta para daltonismo), letra Arial y texto justificado.
 
 **Integrantes:** Juan Sebastián Rueda, David Florez, Luisana Gutiérrez Ruggia.
 
 ## Qué hace
 
 ```
-ingesta ─► descriptivo ─► supuestos ─► MANOVA + ANOVA ─► Hotelling ─► PCA ─► espacial ─► sensibilidad ─► conclusiones ─► PDF
+ingesta ─► descriptivo ─► supuestos ─► MANOVA ─► Hotelling ─► PCA ─► espacial ─► sensibilidad ─► conclusiones ─► PDF
 ```
 
 | Etapa | Contenido |
@@ -19,10 +19,10 @@ ingesta ─► descriptivo ─► supuestos ─► MANOVA + ANOVA ─► Hotelli
 | Ingesta | Estudiantes de Bogotá del periodo elegido (API de datos.gov.co o archivo de DataIcfes), un registro por estudiante (`estu_consecutivo`: la fuente repite filas), sin Noche ni Sabatina y sin puntajes faltantes. Muestra estratificada de 100 por jornada (semilla 123). Promedios de todos los departamentos con los mismos filtros. |
 | Descriptivo | Tamaño por grupo, medias y desviaciones por jornada (muestra y población), matrices de covarianzas y correlaciones. |
 | Supuestos | Atípicos por distancia de Mahalanobis (χ² al 97,5 %), normalidad multivariada de Mardia (global y por jornada) y M de Box. Mahalanobis y Mardia también sobre los residuos dentro de cada jornada. |
-| Explicativo | MANOVA (Pillai, Wilks, Hotelling-Lawley, Roy; η² parcial), ANOVA por prueba con Bonferroni, T² de Hotelling por pares con Bonferroni, PCA sobre la matriz de correlaciones y ANOVA del CP1. |
+| Explicativo | MANOVA (Pillai, Wilks, Hotelling-Lawley, Roy; η² parcial), T² de Hotelling por pares con Bonferroni, PCA sobre la matriz de correlaciones y ANOVA del CP1. |
 | Sensibilidad | MANOVA sin los atípicos intra-jornada, y MANOVA y T² de Hotelling solo con colegios oficiales (la jornada Completa es casi toda privada), con la tabla de % de privados por jornada. |
 | Espacial | Ranking de los departamentos (n ≥ 30) por Matemáticas + Lectura y resultados por localidad de Bogotá, cruzando el código DANE con el directorio de colegios de la SED. Comparación entre localidades (muestra de hasta 100 por localidad): Shapiro-Wilk por localidad con Bonferroni; si se cumple la normalidad se usa ANOVA (η²), o ANOVA de Welch si Levene rechaza la igualdad de varianzas, y si no, Kruskal-Wallis (ε²), para el promedio de las 5 pruebas y para cada prueba. |
-| Informe | `informe_saber11_<periodo>.pdf` con portada, metodología, resultados, conclusiones y fuentes. |
+| Informe | `informe_saber11_<periodo>.pdf`: portada (sin nombres), resumen ejecutivo, datos y método breve, resultados con 7 gráficos (medias, correlaciones, Mardia, dispersión, PCA, % privados, localidades), conclusiones y fuentes. Usa Arial si está instalada (`ttf-mscorefonts-installer`) y si no Liberation Sans, que tiene las mismas medidas. |
 
 ## Requisitos
 

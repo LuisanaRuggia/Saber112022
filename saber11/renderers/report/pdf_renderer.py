@@ -10,7 +10,7 @@ from saber11.renderers.report.pdf_sections_closing import conclusions_section, s
 from saber11.renderers.report.pdf_sections_inference import explanatory_section
 from saber11.renderers.report.pdf_sections_intro import cover, methodology, summary
 from saber11.renderers.report.pdf_sections_stats import assumptions_section, descriptive_section
-from saber11.renderers.report.pdf_styles import draw_footer
+from saber11.renderers.report.pdf_styles import REGULAR, draw_footer
 
 
 def render_pdf(results: PipelineResults, path: Path) -> Path:
@@ -18,7 +18,7 @@ def render_pdf(results: PipelineResults, path: Path) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     doc = SimpleDocTemplate(str(path), pagesize=A4, leftMargin=40, rightMargin=40, topMargin=44, bottomMargin=44,
-                            title="Saber 11 Bogotá: rendimiento por jornada")
+                            title="Saber 11 Bogotá: rendimiento por jornada", initialFontName=REGULAR)
     story = []
     for build in (cover, summary, methodology, descriptive_section, assumptions_section,
                   explanatory_section, spatial_section, conclusions_section, sources_section):

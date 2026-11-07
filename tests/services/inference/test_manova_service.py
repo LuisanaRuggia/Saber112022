@@ -38,13 +38,6 @@ def test_four_statistics_reported(result):
     assert all(test.df_num > 0 and test.df_den > 0 for test in result.tests)
 
 
-def test_followup_anovas(result):
-    assert [row.score for row in result.anovas] == list(SCORES)
-    for row in result.anovas:
-        assert row.p_bonferroni == pytest.approx(min(1.0, row.p_value * 5))
-        assert 0 <= row.eta_squared <= 1
-
-
 def test_identical_groups_not_significant():
     rng = np.random.default_rng(7)
     frame = pd.DataFrame(rng.normal(50, 10, size=(240, 5)), columns=list(SCORES))

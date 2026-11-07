@@ -4,7 +4,8 @@ from saber11.core.formatting.spanish_numbers import fmt_num, fmt_p, fmt_pct
 from saber11.models.analysis.analysis_models import ManovaResult
 from saber11.models.dataset.dataset_models import SCORE_SHORT_LABELS, SCORES, SHIFT_LABELS
 from saber11.models.report.report_models import PipelineResults
-from saber11.renderers.report.pdf_styles import H2, make_table, para
+from saber11.renderers.charts.result_charts import private_share_chart
+from saber11.renderers.report.pdf_styles import H2, figure, make_table, para
 
 
 def _pillai_row(label: str, n: int, manova: ManovaResult) -> list[str]:
@@ -58,6 +59,8 @@ def sensitivity_block(results: PipelineResults) -> list:
              "repite sin los atípicos detectados con la covarianza dentro de jornadas.")
     out = [para("Análisis de sensibilidad", H2), para(intro), make_table(_manova_rows(results)),
            para("Naturaleza del colegio por jornada (población de Bogotá)", H2), make_table(_profile_rows(results)),
+           figure(private_share_chart(results.sensitivity.official_only.profile),
+                  "Figura 6. Porcentaje de estudiantes en colegios privados por jornada (población).", width=330),
            para("Medias por naturaleza y jornada (población de Bogotá)", H2), make_table(_means_rows(results))]
     if results.sensitivity.official_only.hotelling:
         out += [para("T² de Hotelling por pares, solo colegios oficiales", H2),

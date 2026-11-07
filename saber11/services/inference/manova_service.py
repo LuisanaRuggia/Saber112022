@@ -1,12 +1,10 @@
-"""One-way MANOVA of the five scores by shift plus Bonferroni follow-up ANOVAs."""
+"""One-way MANOVA of the five scores by shift."""
 
-import numpy as np
 import pandas as pd
-from scipy import stats
 from statsmodels.multivariate.manova import MANOVA
 
 from saber11.core.errors.pipeline_errors import DataValidationError
-from saber11.models.analysis.analysis_models import AnovaRow, ManovaResult, MultivariateTest
+from saber11.models.analysis.analysis_models import ManovaResult, MultivariateTest
 from saber11.models.dataset.dataset_models import SCORES, SHIFT, SHIFTS
 
 TEST_NAMES = ("Pillai's trace", "Wilks' lambda", "Hotelling-Lawley trace", "Roy's greatest root")
@@ -40,24 +38,8 @@ def _multivariate_tests(frame: pd.DataFrame) -> list[MultivariateTest]:
     ]
 
 
-def _anova(frame: pd.DataFrame, score: str, shifts: list[str]) -> AnovaRow:
-    """Run a one-way ANOVA of one score by shift with Bonferroni and eta squared."""
-    groups = [frame.loc[frame[SHIFT] == shift, score].to_numpy(float) for shift in shifts]
-    f_value, p_value = stats.f_oneway(*groups)
-    values = np.concatenate(groups)
-    ss_total = ((values - values.mean()) ** 2).sum()
-    ss_between = sum(len(group) * (group.mean() - values.mean()) ** 2 for group in groups)
-    return AnovaRow(
-        score=score,
-        f_value=float(f_value),
-        p_value=float(p_value),
-        p_bonferroni=float(min(1.0, p_value * len(SCORES))),
-        eta_squared=float(ss_between / ss_total),
-    )
-
-
 def run_manova(sample: pd.DataFrame) -> ManovaResult:
-    """Test whether the score vector differs by shift, with Bonferroni follow-up ANOVAs."""
+    """Test whether the score vector differs by shift."""
     frame = _in_scope(sample)
     shifts = [shift for shift in SHIFTS if shift in set(frame[SHIFT])]
     tests = _multivariate_tests(frame)
@@ -68,5 +50,4 @@ def run_manova(sample: pd.DataFrame) -> ManovaResult:
         pillai=pillai.value,
         pillai_p=pillai.p_value,
         partial_eta_squared=pillai.value / s,
-        anovas=[_anova(frame, score, shifts) for score in SCORES],
     )

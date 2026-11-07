@@ -29,6 +29,7 @@ class MahalanobisResult:
     n_outliers: int
     pct_outliers: float  # percentage on a 0-100 scale
     outlier_index: list[int] = field(default_factory=list)
+    squared_distances: list[float] = field(default_factory=list)  # one per analyzed row, for Q-Q plots
 
 
 @dataclass(frozen=True)
@@ -83,25 +84,13 @@ class MultivariateTest:
 
 
 @dataclass(frozen=True)
-class AnovaRow:
-    """Follow-up univariate ANOVA for one score."""
-
-    score: str
-    f_value: float
-    p_value: float
-    p_bonferroni: float
-    eta_squared: float
-
-
-@dataclass(frozen=True)
 class ManovaResult:
-    """MANOVA statistics plus follow-up ANOVAs."""
+    """MANOVA statistics (Pillai, Wilks, Hotelling-Lawley, Roy) and partial eta squared."""
 
     tests: list[MultivariateTest]
     pillai: float
     pillai_p: float
     partial_eta_squared: float
-    anovas: list[AnovaRow]
 
 
 @dataclass(frozen=True)

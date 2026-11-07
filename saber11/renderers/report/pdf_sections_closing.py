@@ -4,7 +4,8 @@ from saber11.core.formatting.spanish_numbers import fmt_num, fmt_pct
 from saber11.models.dataset.dataset_models import SCORE_LABELS, SCORE_SHORT_LABELS, SCORES
 from saber11.models.report.report_models import PipelineResults
 from saber11.renderers.report.pdf_sections_locality import locality_tests_block
-from saber11.renderers.report.pdf_styles import H1, H2, bullet, make_table, para
+from saber11.renderers.charts.result_charts import locality_chart
+from saber11.renderers.report.pdf_styles import H1, H2, bullet, figure, make_table, para
 
 def _department_rows(results: PipelineResults) -> tuple[list, tuple[int, ...]]:
     table = results.spatial.departments.table.sort_values("rank").head(33)
@@ -25,7 +26,8 @@ def _locality_block(results: PipelineResults) -> list:
     rows = [["Localidad", "n", *[SCORE_SHORT_LABELS[s] for s in SCORES], "Prom. 5"]]
     for _, r in loc.table.iterrows():
         rows.append([r["localidad"], fmt_num(r["n"], 0), *[fmt_num(r[s], 1) for s in SCORES], fmt_num(r["avg_5"], 1)])
-    return [make_table(rows), para(f"Tasa de cruce con el directorio: {fmt_pct(loc.match_rate)} "
+    chart = figure(locality_chart(loc.table), "Figura 7. Promedio de las cinco pruebas por localidad.", width=380)
+    return [make_table(rows), chart, para(f"Tasa de cruce con el directorio: {fmt_pct(loc.match_rate)} "
                                    f"de {fmt_num(loc.n_students, 0)} estudiantes. Directorio: {loc.directory_source}"),
             *locality_tests_block(loc.tests)]
 

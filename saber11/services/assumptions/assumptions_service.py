@@ -37,6 +37,7 @@ def mahalanobis(values: np.ndarray, quantile: float, positions: np.ndarray,
         n_outliers=len(outliers),
         pct_outliers=100.0 * len(outliers) / len(values),
         outlier_index=[int(positions[index]) for index in outliers],
+        squared_distances=[float(d) for d in distances],
     )
 
 

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from saber11.models.analysis.analysis_models import (
-    AnovaRow, AssumptionsResult, BoxMResult, DescriptiveResult, HotellingPair,
+    AssumptionsResult, BoxMResult, DescriptiveResult, HotellingPair,
     MahalanobisResult, ManovaResult, MardiaResult, MultivariateTest, PcaResult,
 )
 from saber11.models.analysis.sensitivity_models import NatureSensitivity, OutlierSensitivity, SensitivityResult
@@ -30,8 +30,7 @@ def _manova(significant: bool) -> ManovaResult:
     p = 0.0001 if significant else 0.4
     names = ("Pillai's trace", "Wilks' lambda", "Hotelling-Lawley trace", "Roy's greatest root")
     tests = [MultivariateTest(n, 0.2, 5.0, 15.0, 1180.0, p) for n in names]
-    anovas = [AnovaRow(s, 10.0, p, min(1.0, p * 5), 0.06) for s in SCORES]
-    return ManovaResult(tests=tests, pillai=0.202, pillai_p=p, partial_eta_squared=0.067, anovas=anovas)
+    return ManovaResult(tests=tests, pillai=0.202, pillai_p=p, partial_eta_squared=0.067)
 
 
 def _hotelling(significant: bool) -> list[HotellingPair]:

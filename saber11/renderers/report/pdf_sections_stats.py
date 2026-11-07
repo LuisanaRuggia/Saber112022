@@ -5,7 +5,9 @@ import pandas as pd
 from saber11.core.formatting.spanish_numbers import fmt_num, fmt_p
 from saber11.models.dataset.dataset_models import SCORE_LABELS, SCORES, SHIFT_LABELS
 from saber11.models.report.report_models import PipelineResults
-from saber11.renderers.report.pdf_styles import H1, H2, make_table, para
+from saber11.renderers.charts.assumption_charts import mardia_chart
+from saber11.renderers.charts.descriptive_charts import correlation_heatmap, dispersion_chart, means_chart
+from saber11.renderers.report.pdf_styles import H1, H2, figure, make_table, para
 
 def _matrix(df: pd.DataFrame, decimals: int) -> list[list[str]]:
     rows = [[""] + [SCORE_LABELS[c] for c in df.columns]]
@@ -29,9 +31,12 @@ def descriptive_section(results: PipelineResults) -> list:
         for g, n in d.n_by_group.items()]
     return [para("3. Análisis descriptivo", H1), para("Tamaño por grupo", H2), make_table(n_rows),
             para("Medias (desviación estándar) de la muestra", H2), make_table(_means_rows(d.means, d.std)),
+            figure(means_chart(d.means), "Figura 1. Puntaje medio por jornada y prueba (muestra)."),
             para("Medias de la población de Bogotá", H2), make_table(_means_rows(d.population_means, None)),
             para("Matriz de covarianzas (muestra)", H2), make_table(_matrix(d.covariance, 1)),
-            para("Matriz de correlaciones (muestra)", H2), make_table(_matrix(d.correlation, 3))]
+            para("Matriz de correlaciones (muestra)", H2), make_table(_matrix(d.correlation, 3)),
+            figure(correlation_heatmap(d.correlation), "Figura 2. Matriz de correlaciones entre pruebas (muestra).",
+                   width=280)]
 
 
 WITHIN_NOTE = ("La guía calcula Mahalanobis y Mardia con la covarianza total, que mezcla las diferencias entre "
@@ -66,4 +71,8 @@ def assumptions_section(results: PipelineResults) -> list:
     rows.append(["M de Box", f"χ² = {fmt_num(box.chi2, 2)} (gl = {box.df})", fmt_p(box.p_value), ok(box.p_value)])
     return [para("4. Supuestos", H1), para("Método de la guía (covarianza total)", H2), make_table(rows),
             para("Dentro de jornadas (residuos y covarianza combinada)", H2), make_table(_within_rows(a, alpha)),
-            para(WITHIN_NOTE)]
+            para(WITHIN_NOTE),
+            figure(mardia_chart(a, alpha), "Figura 3. Normalidad multivariada de Mardia: estadísticos frente a su "
+                   "distribución de referencia, p-valor por jornada y gráfico Q-Q de las distancias de Mahalanobis."),
+            figure(dispersion_chart(results.descriptive.std), "Figura 4. Desviación estándar por jornada y prueba: "
+                   "la dispersión que compara la M de Box.")]
